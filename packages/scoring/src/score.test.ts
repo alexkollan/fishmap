@@ -43,13 +43,13 @@ describe("scoreHour", () => {
     const hourly = buildHourlySeries({ weatherCode: 95 });
     const result = scoreHour(hourly, 60, sunMoon, "shore");
     expect(result.score).toBeLessThanOrEqual(20);
-    expect(result.vetoes.some((v) => v.includes("Thunderstorm"))).toBe(true);
+    expect(result.vetoes.some((v) => v.key === "thunderstorm")).toBe(true);
   });
 
   it("vetoes high wind for shore but not for a calmer threshold mismatch", () => {
     const hourly = buildHourlySeries({ windSpeed10m: 50 });
     const result = scoreHour(hourly, 60, sunMoon, "shore");
-    expect(result.vetoes.some((v) => v.includes("Wind too strong"))).toBe(true);
+    expect(result.vetoes.some((v) => v.key === "wind.shore")).toBe(true);
   });
 
   it("flags missing marine data as a caveat rather than failing", () => {

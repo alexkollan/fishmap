@@ -16,7 +16,14 @@ import { checkVetoes } from "./vetoes.js";
 import { DEFAULT_WEIGHT_PROFILES } from "./weights.js";
 
 function toFactorScore(raw: RawFactor, profile: WeightProfile): FactorScore {
-  return { key: raw.key, score: raw.score, weight: profile.weights[raw.key] ?? 0, note: raw.note };
+  return {
+    key: raw.key,
+    score: raw.score,
+    weight: profile.weights[raw.key] ?? 0,
+    note: raw.note,
+    noteKey: raw.noteKey,
+    noteParams: raw.noteParams,
+  };
 }
 
 function weightedAverage(factors: FactorScore[]): number {
@@ -42,11 +49,12 @@ export function scoreHour(
   sunMoon: SunMoonData,
   mode: Mode,
   profile: WeightProfile = DEFAULT_WEIGHT_PROFILES[mode],
+  aspectDeg?: number,
 ): ScoreResult {
   const wx = hourly[index];
   const caveats: string[] = [];
   if (!wx) {
-    return { score: 0, vetoes: ["No weather data for this hour."], factors: [], caveats };
+    return { score: 0, vetoes: [{ key: "noData", note: "No weather data for this hour." }], factors: [], caveats };
   }
   if (wx.waveHeight === undefined) {
     caveats.push(
@@ -56,7 +64,7 @@ export function scoreHour(
 
   const raw: RawFactor[] = [
     pressureTrend(hourly, index),
-    windRelative(wx, mode),
+    windRelative(wx, mode, aspectDeg),
     waveConditions(wx, mode),
     turbidity(hourly, index, mode),
     seaTempFactor(hourly, index),

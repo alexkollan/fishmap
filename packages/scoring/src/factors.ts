@@ -1,7 +1,15 @@
 // Pure per-factor scoring functions (DEV_PLAN.md §4). Each returns a raw
-// {key, score, note} — weighting is applied once, centrally, in score.ts
-// from the active WeightProfile, so a factor never has to know how
-// important it is, only how to grade the condition it's given.
+// {key, score, note, noteKey, noteParams} — weighting is applied once,
+// centrally, in score.ts from the active WeightProfile, so a factor never
+// has to know how important it is, only how to grade the condition it's
+// given.
+//
+// `note` is an English fallback for non-UI consumers (logs, notification
+// bodies). The web UI renders `noteKey`/`noteParams` through
+// apps/web/src/lib/i18n/renderFactorNote.ts instead, against
+// Dictionary.factorNotes, so every note is fully bilingual — see
+// PROGRESS.md for why this indirection exists (the note text used to be
+// English-only).
 import type { Mode, SunMoonData, SunTimes, WeatherHour } from "@fishmap/types";
 import { clamp, interpolateCurve } from "./curve.js";
 import { isWithinDawnWindow, isWithinDuskWindow } from "./time.js";
@@ -10,6 +18,12 @@ export interface RawFactor {
   key: string;
   score: number;
   note: string;
+  noteKey: string;
+  noteParams?: Record<string, number | string>;
+}
+
+function factor(key: string, score: number, note: string, noteKey: string, noteParams?: Record<string, number | string>): RawFactor {
+  return { key, score: Math.round(clamp(score, 0, 100)), note, noteKey, noteParams };
 }
 
 const HOUR_MS = 3_600_000;
@@ -45,34 +59,45 @@ function pressureCurveScore(delta3h: number, delta6h: number, absolute: number):
 export function pressureTrend(hourly: WeatherHour[], index: number): RawFactor {
   const current = hourly[index]?.pressureMsl;
   if (current === undefined) {
-    return { key: "pressure", score: 50, note: "No pressure data available." };
+    return factor("pressure", 50, "No pressure data available.", "pressure.noData");
   }
   const at3h = index >= 3 ? hourly[index - 3]?.pressureMsl : undefined;
   const at6h = index >= 6 ? hourly[index - 6]?.pressureMsl : undefined;
   if (at3h === undefined || at6h === undefined) {
-    return { key: "pressure", score: 65, note: "Not enough history yet — treating pressure as stable." };
+    return factor("pressure", 65, "Not enough history yet — treating pressure as stable.", "pressure.noHistory");
   }
 
   const delta3h = current - at3h;
   const delta6h = current - at6h;
   const score = pressureCurveScore(delta3h, delta6h, current);
 
-  const note =
-    delta3h >= 2
-      ? `Rising sharply (+${delta3h.toFixed(1)} hPa/3h) — classic post-front slump, give it 24-36h.`
-      : delta6h <= -1
-        ? `Falling (${delta6h.toFixed(1)} hPa/6h) — front approaching, fish are loading up.`
-        : delta6h >= 1
-          ? `Rising (${delta6h.toFixed(1)} hPa/6h) — activity easing off.`
-          : `Stable (${delta6h.toFixed(1)} hPa/6h).`;
-
-  return { key: "pressure", score: Math.round(clamp(score, 0, 100)), note };
+  if (delta3h >= 2) {
+    return factor(
+      "pressure",
+      score,
+      `Rising sharply (+${delta3h.toFixed(1)} hPa/3h) — classic post-front slump, give it 24-36h.`,
+      "pressure.risingSharp",
+      { delta: Math.round(delta3h * 10) / 10 },
+    );
+  }
+  if (delta6h <= -1) {
+    return factor("pressure", score, `Falling (${delta6h.toFixed(1)} hPa/6h) — front approaching, fish are loading up.`, "pressure.falling", {
+      delta: Math.round(delta6h * 10) / 10,
+    });
+  }
+  if (delta6h >= 1) {
+    return factor("pressure", score, `Rising (${delta6h.toFixed(1)} hPa/6h) — activity easing off.`, "pressure.rising", {
+      delta: Math.round(delta6h * 10) / 10,
+    });
+  }
+  return factor("pressure", score, `Stable (${delta6h.toFixed(1)} hPa/6h).`, "pressure.stable", { delta: Math.round(delta6h * 10) / 10 });
 }
 
 // --- 4.2 Wind ---------------------------------------------------------------
-// No coastline segment yet (aspect lands with the Phase 4 pipeline), so this
-// scores wind speed alone. `aspectDeg` is accepted for forward compat but
-// unused until a segment can supply it.
+// Speed-only until a coastline segment can supply its facing bearing
+// (`aspectDeg`, precomputed by tools/coastline-pipeline — seaward normal of
+// the segment). The map passes it in; single-point pages (no segment) don't
+// and fall back to speed-only scoring, same as before.
 
 function shoreWindScore(speedKmh: number, isDay: boolean): number {
   if (speedKmh < 5) return isDay ? 45 : 65;
@@ -104,23 +129,89 @@ function spearWindScore(speedKmh: number): number {
   ]);
 }
 
-export function windRelative(wx: WeatherHour, mode: Mode, _aspectDeg?: number): RawFactor {
-  const speed = wx.windSpeed10m;
-  if (speed === undefined) return { key: "wind", score: 50, note: "No wind data available." };
+/** Circular difference between wind "from" bearing and the shore's seaward
+ * aspect, 0-180°. ~0° = wind blowing from the sea toward land = onshore.
+ * ~180° = wind blowing from land toward the sea = offshore. ~90° = cross-shore. */
+function windShoreAngle(windFromDeg: number, aspectDeg: number): number {
+  const diff = Math.abs(((windFromDeg - aspectDeg + 540) % 360) - 180);
+  return 180 - diff;
+}
 
-  let score: number;
-  let note: string;
-  if (mode === "boat") {
-    score = boatWindScore(speed);
-    note = `${speed.toFixed(0)} km/h — ${score >= 85 ? "calm, comfortable" : score >= 60 ? "workable" : "getting rough"}.`;
-  } else if (mode === "spearfishing") {
-    score = spearWindScore(speed);
-    note = `${speed.toFixed(0)} km/h — ${score >= 80 ? "flat, good visibility conditions" : score >= 40 ? "some chop building" : "too much chop for good visibility"}.`;
-  } else {
-    score = shoreWindScore(speed, wx.isDay !== 0);
-    note = `${speed.toFixed(0)} km/h. Direction-relative-to-shore scoring lands once the coastline pipeline (Phase 4) knows this spot's aspect.`;
+type ShoreRelation = "onshore" | "cross" | "offshore";
+
+function classifyRelation(angle: number): ShoreRelation {
+  if (angle <= 45) return "onshore";
+  if (angle >= 135) return "offshore";
+  return "cross";
+}
+
+// DEV_PLAN.md §4.2: onshore 8-20 km/h is the best case, offshore flattens
+// the water, and the veto thresholds (checked separately in vetoes.ts) are
+// direction-dependent — onshore gets dangerous far sooner than offshore.
+function shoreWindScoreWithAspect(speedKmh: number, relation: ShoreRelation, isDay: boolean): number {
+  if (speedKmh < 5) return isDay ? 45 : 65;
+  if (relation === "onshore") {
+    return interpolateCurve(speedKmh, [
+      [5, 65],
+      [8, 90],
+      [14, 100],
+      [20, 90],
+      [35, 50],
+      [45, 20],
+    ]);
   }
-  return { key: "wind", score: Math.round(clamp(score, 0, 100)), note };
+  if (relation === "offshore") {
+    return interpolateCurve(speedKmh, [
+      [5, 55],
+      [15, 50],
+      [30, 40],
+      [45, 25],
+    ]);
+  }
+  return interpolateCurve(speedKmh, [
+    [5, 60],
+    [12, 85],
+    [20, 75],
+    [35, 50],
+    [45, 20],
+  ]);
+}
+
+export function windRelative(wx: WeatherHour, mode: Mode, aspectDeg?: number): RawFactor {
+  const speed = wx.windSpeed10m;
+  if (speed === undefined) return factor("wind", 50, "No wind data available.", "wind.noData");
+
+  const speedParam = Math.round(speed);
+
+  if (mode === "boat") {
+    const score = boatWindScore(speed);
+    const key = score >= 85 ? "wind.boat.calm" : score >= 60 ? "wind.boat.workable" : "wind.boat.rough";
+    return factor("wind", score, `${speed.toFixed(0)} km/h.`, key, { speed: speedParam });
+  }
+
+  if (mode === "spearfishing") {
+    const score = spearWindScore(speed);
+    const key = score >= 80 ? "wind.spear.flat" : score >= 40 ? "wind.spear.someChop" : "wind.spear.tooMuchChop";
+    return factor("wind", score, `${speed.toFixed(0)} km/h.`, key, { speed: speedParam });
+  }
+
+  // shore
+  if (aspectDeg === undefined || wx.windDirection10m === undefined) {
+    const score = shoreWindScore(speed, wx.isDay !== 0);
+    return factor(
+      "wind",
+      score,
+      `${speed.toFixed(0)} km/h. Direction-relative-to-shore scoring needs this spot's coastline aspect.`,
+      "wind.shore.speedOnly",
+      { speed: speedParam },
+    );
+  }
+
+  const angle = windShoreAngle(wx.windDirection10m, aspectDeg);
+  const relation = classifyRelation(angle);
+  const score = shoreWindScoreWithAspect(speed, relation, wx.isDay !== 0);
+  const relationKey = speed < 5 ? "wind.shore.calm" : `wind.shore.${relation}`;
+  return factor("wind", score, `${speed.toFixed(0)} km/h, ${relation}.`, relationKey, { speed: speedParam });
 }
 
 // --- 4.3 Waves --------------------------------------------------------------
@@ -156,14 +247,14 @@ function spearWaveScore(h: number): number {
 
 export function waveConditions(wx: WeatherHour, mode: Mode): RawFactor {
   const h = wx.waveHeight;
-  if (h === undefined) return { key: "waves", score: 50, note: "No wave data available near this point." };
+  if (h === undefined) return factor("waves", 50, "No wave data available near this point.", "waves.noData");
   const score = mode === "boat" ? boatWaveScore(h) : mode === "spearfishing" ? spearWaveScore(h) : shoreWaveScore(h);
-  return { key: "waves", score: Math.round(clamp(score, 0, 100)), note: `${h.toFixed(1)} m wave height.` };
+  return factor("waves", score, `${h.toFixed(1)} m wave height.`, "waves.height", { height: Math.round(h * 10) / 10 });
 }
 
 // --- 4.4 Turbidity (derived) -------------------------------------------------
-// No river-mouth distance or substrate yet (segment-level, Phase 4) — modelled
-// from wave height/period and 24h rainfall only.
+// No river-mouth distance or substrate yet (segment-level, Phase 4) —
+// modelled from wave height/period and 24h rainfall only.
 
 function sumPrecip(hourly: WeatherHour[], index: number, hours: number): number {
   let sum = 0;
@@ -173,7 +264,7 @@ function sumPrecip(hourly: WeatherHour[], index: number, hours: number): number 
 
 export function turbidity(hourly: WeatherHour[], index: number, mode: Mode): RawFactor {
   const wx = hourly[index];
-  if (!wx) return { key: "turbidity", score: 50, note: "No data available." };
+  if (!wx) return factor("turbidity", 50, "No data available.", "turbidity.noData");
 
   const waveComponent =
     wx.waveHeight !== undefined && wx.wavePeriod !== undefined
@@ -200,8 +291,9 @@ export function turbidity(hourly: WeatherHour[], index: number, mode: Mode): Raw
           [1, 40],
         ]);
 
+  const noteKey = turbid < 0.3 ? "turbidity.clear" : turbid < 0.6 ? "turbidity.some" : "turbidity.murky";
   const note = turbid < 0.3 ? "Water likely clear." : turbid < 0.6 ? "Some turbidity expected." : "Likely murky water.";
-  return { key: "turbidity", score: Math.round(clamp(score, 0, 100)), note };
+  return factor("turbidity", score, note, noteKey);
 }
 
 // --- 4.5 Sea surface temperature ---------------------------------------------
@@ -209,7 +301,7 @@ export function turbidity(hourly: WeatherHour[], index: number, mode: Mode): Raw
 export function seaTempFactor(hourly: WeatherHour[], index: number): RawFactor {
   const wx = hourly[index];
   const sst = wx?.seaSurfaceTemperature;
-  if (sst === undefined) return { key: "seaTemp", score: 50, note: "No sea temperature data available." };
+  if (sst === undefined) return factor("seaTemp", 50, "No sea temperature data available.", "seaTemp.noData");
 
   const idx48hAgo = index - 48;
   const sst48hAgo = idx48hAgo >= 0 ? hourly[idx48hAgo]?.seaSurfaceTemperature : undefined;
@@ -217,14 +309,18 @@ export function seaTempFactor(hourly: WeatherHour[], index: number): RawFactor {
   if (sst48hAgo !== undefined) {
     const delta = sst - sst48hAgo;
     if (delta <= -2) {
-      return {
-        key: "seaTemp",
-        score: 25,
-        note: `Sea temperature dropped ${Math.abs(delta).toFixed(1)}°C in 48h — bite likely shut down.`,
-      };
+      return factor(
+        "seaTemp",
+        25,
+        `Sea temperature dropped ${Math.abs(delta).toFixed(1)}°C in 48h — bite likely shut down.`,
+        "seaTemp.dropped",
+        { delta: Math.round(Math.abs(delta) * 10) / 10 },
+      );
     }
     if (delta >= 0.5) {
-      return { key: "seaTemp", score: 75, note: `Gently warming (+${delta.toFixed(1)}°C/48h).` };
+      return factor("seaTemp", 75, `Gently warming (+${delta.toFixed(1)}°C/48h).`, "seaTemp.warming", {
+        delta: Math.round(delta * 10) / 10,
+      });
     }
   }
 
@@ -235,12 +331,12 @@ export function seaTempFactor(hourly: WeatherHour[], index: number): RawFactor {
     [26, 60],
     [29, 45],
   ]);
-  return { key: "seaTemp", score: Math.round(score), note: `${sst.toFixed(1)}°C sea surface temperature.` };
+  return factor("seaTemp", score, `${sst.toFixed(1)}°C sea surface temperature.`, "seaTemp.value", { sst: Math.round(sst * 10) / 10 });
 }
 
 // --- 4.6/4.7 Light window (time-of-day × cloud, multiplicative) -------------
 
-function timeOfDayBase(tMs: number, sun: SunTimes, isDay: 0 | 1 | undefined, mode: Mode): { score: number; label: string } {
+function timeOfDayBase(tMs: number, sun: SunTimes, isDay: 0 | 1 | undefined, mode: Mode): { score: number; noteKey: string } {
   if (mode === "spearfishing") {
     const solarNoon = Date.parse(sun.solarNoon);
     const hoursFromNoon = Number.isNaN(solarNoon) ? 6 : Math.abs(tMs - solarNoon) / HOUR_MS;
@@ -250,14 +346,14 @@ function timeOfDayBase(tMs: number, sun: SunTimes, isDay: 0 | 1 | undefined, mod
       [6, 45],
       [9, 15],
     ]);
-    return { score, label: "midday light for underwater visibility" };
+    return { score, noteKey: "light.spearMidday" };
   }
 
   const sunrise = Date.parse(sun.sunrise);
   const sunset = Date.parse(sun.sunset);
-  if (!Number.isNaN(sunrise) && isWithinDawnWindow(tMs, sunrise)) return { score: 100, label: "dawn window" };
-  if (!Number.isNaN(sunset) && isWithinDuskWindow(tMs, sunset)) return { score: 100, label: "dusk window" };
-  if (isDay === 0) return { score: 65, label: "night" };
+  if (!Number.isNaN(sunrise) && isWithinDawnWindow(tMs, sunrise)) return { score: 100, noteKey: "light.dawn" };
+  if (!Number.isNaN(sunset) && isWithinDuskWindow(tMs, sunset)) return { score: 100, noteKey: "light.dusk" };
+  if (isDay === 0) return { score: 65, noteKey: "light.night" };
 
   const solarNoon = Date.parse(sun.solarNoon);
   const hoursFromNoon = Number.isNaN(solarNoon) ? 6 : Math.abs(tMs - solarNoon) / HOUR_MS;
@@ -266,15 +362,16 @@ function timeOfDayBase(tMs: number, sun: SunTimes, isDay: 0 | 1 | undefined, mod
     [3, 45],
     [6, 75],
   ]);
-  return { score, label: "daytime" };
+  return { score, noteKey: "light.daytime" };
 }
 
 export function lightWindow(wx: WeatherHour, sun: SunTimes, mode: Mode): RawFactor {
   const tMs = Date.parse(wx.time);
-  const { score: base, label } = timeOfDayBase(tMs, sun, wx.isDay, mode);
+  const { score: base, noteKey: baseKey } = timeOfDayBase(tMs, sun, wx.isDay, mode);
 
   let score = base;
-  let cloudNote = "";
+  let noteKey = baseKey;
+  let note = baseKey.replace("light.", "");
   if (wx.cloudCover !== undefined && mode !== "spearfishing") {
     const isLowLightAlready = base >= 65;
     const multiplier = isLowLightAlready
@@ -286,18 +383,19 @@ export function lightWindow(wx: WeatherHour, sun: SunTimes, mode: Mode): RawFact
           : 1;
     score = base * multiplier;
     if (wx.cloudCover >= 60 && !isLowLightAlready) {
-      cloudNote = " Heavy overcast is extending the low-light advantage across the day.";
+      noteKey = "light.daytimeOvercast";
+      note = "Heavy overcast is extending the low-light advantage across the day.";
     }
   }
 
-  return { key: "light", score: Math.round(clamp(score, 0, 100)), note: `${label}.${cloudNote}` };
+  return factor("light", score, note, noteKey);
 }
 
 // --- 4.8 Precipitation -------------------------------------------------------
 
 export function precipitationFactor(wx: WeatherHour): RawFactor {
   const p = wx.precipitation;
-  if (p === undefined) return { key: "precipitation", score: 65, note: "No precipitation data available." };
+  if (p === undefined) return factor("precipitation", 65, "No precipitation data available.", "precipitation.noData");
   const score = interpolateCurve(p, [
     [0, 65],
     [0.1, 85],
@@ -307,7 +405,7 @@ export function precipitationFactor(wx: WeatherHour): RawFactor {
     [8.01, 35],
     [20, 20],
   ]);
-  return { key: "precipitation", score: Math.round(score), note: `${p.toFixed(1)} mm/h.` };
+  return factor("precipitation", score, `${p.toFixed(1)} mm/h.`, "precipitation.value", { mm: Math.round(p * 10) / 10 });
 }
 
 // --- 4.9 Moon phase and solunar periods --------------------------------------
@@ -320,13 +418,13 @@ export function precipitationFactor(wx: WeatherHour): RawFactor {
 
 export function describeMoonPhase(phase: number): string {
   if (phase < 0.03 || phase > 0.97) return "new";
-  if (phase < 0.22) return "waxing crescent";
-  if (phase < 0.28) return "first quarter";
-  if (phase < 0.47) return "waxing gibbous";
+  if (phase < 0.22) return "waxingCrescent";
+  if (phase < 0.28) return "firstQuarter";
+  if (phase < 0.47) return "waxingGibbous";
   if (phase < 0.53) return "full";
-  if (phase < 0.72) return "waning gibbous";
-  if (phase < 0.78) return "last quarter";
-  return "waning crescent";
+  if (phase < 0.72) return "waningGibbous";
+  if (phase < 0.78) return "lastQuarter";
+  return "waningCrescent";
 }
 
 export function solunarFactor(wx: WeatherHour, sunMoon: SunMoonData): RawFactor {
@@ -338,20 +436,30 @@ export function solunarFactor(wx: WeatherHour, sunMoon: SunMoonData): RawFactor 
     [0, 85],
     [1, 60],
   ]);
+  const phaseKey = describeMoonPhase(sunMoon.moon.phase);
 
   let score = phaseScore;
-  let note = `Moon ${describeMoonPhase(sunMoon.moon.phase)}.`;
-  if (activeWindow) {
-    score = Math.max(score, activeWindow.type === "major" ? 90 : 75);
-    if (activeWindow.alignsWithTwilight) {
-      score = 100;
-      note += " Solunar major period aligns with dawn/dusk right now — the strongest combined signal the app can produce.";
-    } else {
-      note += ` Active solunar ${activeWindow.type} period.`;
-    }
+  if (!activeWindow) {
+    return factor("solunar", score, `Moon ${phaseKey}.`, "solunar.phase", { phaseKey });
   }
 
-  return { key: "solunar", score: Math.round(clamp(score, 0, 100)), note };
+  score = Math.max(score, activeWindow.type === "major" ? 90 : 75);
+  if (activeWindow.alignsWithTwilight) {
+    return factor(
+      "solunar",
+      100,
+      `Moon ${phaseKey}. Solunar major period aligns with dawn/dusk right now — the strongest combined signal the app can produce.`,
+      "solunar.alignsWithTwilight",
+      { phaseKey },
+    );
+  }
+  return factor(
+    "solunar",
+    score,
+    `Moon ${phaseKey}. Active solunar ${activeWindow.type} period.`,
+    activeWindow.type === "major" ? "solunar.activeMajor" : "solunar.activeMinor",
+    { phaseKey },
+  );
 }
 
 // --- 4.10 Current -------------------------------------------------------------
@@ -383,14 +491,20 @@ function spearCurrentScore(knots: number): number {
 
 export function currentFactor(wx: WeatherHour, mode: Mode): RawFactor {
   const kmh = wx.oceanCurrentVelocity;
-  if (kmh === undefined) return { key: "current", score: 50, note: "No current data available." };
+  if (kmh === undefined) return factor("current", 50, "No current data available.", "current.noData");
   const knots = kmh / KMH_PER_KNOT;
   const score = mode === "spearfishing" ? spearCurrentScore(knots) : shoreOrBoatCurrentScore(knots);
-  const note =
-    mode === "spearfishing"
-      ? `${knots.toFixed(2)} kn current — slack water gives the best visibility and easiest diving.`
-      : `${knots.toFixed(2)} kn current.`;
-  return { key: "current", score: Math.round(score), note };
+  const knotsParam = Math.round(knots * 100) / 100;
+  if (mode === "spearfishing") {
+    return factor(
+      "current",
+      score,
+      `${knots.toFixed(2)} kn current — slack water gives the best visibility and easiest diving.`,
+      "current.spear",
+      { knots: knotsParam },
+    );
+  }
+  return factor("current", score, `${knots.toFixed(2)} kn current.`, "current.default", { knots: knotsParam });
 }
 
 // --- 4.11 Seasonality (v1: coarse month + SST, no species) -------------------
@@ -404,5 +518,5 @@ export function seasonality(wx: WeatherHour): RawFactor {
   const sst = wx.seaSurfaceTemperature;
   const score = sst === undefined ? base : clamp(base + (sst >= 16 && sst <= 24 ? 5 : -5), 0, 100);
   const monthName = date.toLocaleDateString("en-US", { month: "long" });
-  return { key: "seasonality", score: Math.round(score), note: `${monthName} — general Greek coastal fishery activity.` };
+  return factor("seasonality", score, `${monthName} — general Greek coastal fishery activity.`, "seasonality.value", { monthKey: month });
 }

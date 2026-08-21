@@ -13,12 +13,30 @@ export interface FactorScore {
   key: string;
   score: number;
   weight: number;
+  /** English fallback — used server-side (logs, notification bodies) where
+   * there's no i18n layer. UI must render via `noteKey`/`noteParams`
+   * instead (apps/web/src/lib/i18n/renderFactorNote.ts) so Greek users
+   * never see this. */
   note: string;
+  /** Translation key into Dictionary.factorNotes, e.g. "pressure.falling". */
+  noteKey: string;
+  /** Interpolation values for the noteKey template. Reserved param names
+   * `phaseKey` and `monthKey` are re-translated (moon phase / month name)
+   * rather than interpolated as raw numbers. */
+  noteParams?: Record<string, number | string>;
+}
+
+export interface VetoInfo {
+  /** Translation key into Dictionary.vetoes, e.g. "wind.shore". */
+  key: string;
+  /** English fallback, same rationale as FactorScore.note. */
+  note: string;
+  params?: Record<string, number>;
 }
 
 export interface ScoreResult {
   score: number;
-  vetoes: string[];
+  vetoes: VetoInfo[];
   factors: FactorScore[];
   caveats: string[];
 }
