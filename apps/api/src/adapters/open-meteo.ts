@@ -85,3 +85,38 @@ export function fetchMarine(lat: number, lon: number, days = 7) {
     timezone: "auto",
   });
 }
+
+async function fetchOpenMeteoBatch(
+  url: string,
+  points: { lat: number; lon: number }[],
+  hourly: string,
+  days: number,
+): Promise<OpenMeteoHourlyResponse[]> {
+  const qs = new URLSearchParams({
+    latitude: points.map((p) => String(p.lat)).join(","),
+    longitude: points.map((p) => String(p.lon)).join(","),
+    hourly,
+    forecast_days: String(days),
+    past_days: String(PAST_DAYS),
+    timezone: "auto",
+  });
+  const res = await fetch(`${url}?${qs.toString()}`);
+  if (!res.ok) {
+    throw new Error(`Open-Meteo batch request failed (${res.status}): ${await res.text()}`);
+  }
+  const json = (await res.json()) as OpenMeteoHourlyResponse | OpenMeteoHourlyResponse[];
+  // Open-Meteo returns a bare object for a single coordinate pair and an
+  // array once there's more than one — normalise to always-an-array so
+  // callers don't special-case the single-point map viewport.
+  return Array.isArray(json) ? json : [json];
+}
+
+/** Map's viewport fetch (DEV_PLAN.md §5.2): one request for every grid point
+ * the visible coastline needs, instead of one request per segment. */
+export function fetchForecastBatch(points: { lat: number; lon: number }[], days = 7) {
+  return fetchOpenMeteoBatch(FORECAST_URL, points, FORECAST_HOURLY, days);
+}
+
+export function fetchMarineBatch(points: { lat: number; lon: number }[], days = 7) {
+  return fetchOpenMeteoBatch(MARINE_URL, points, MARINE_HOURLY, days);
+}

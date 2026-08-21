@@ -5,12 +5,15 @@ import { AnalyticsProvider } from "@/lib/analytics/AnalyticsProvider";
 import { AnalyticsTracker } from "@/lib/analytics/AnalyticsTracker";
 import { AppShell } from "@/ui/AppShell";
 import { TodayPage } from "@/routes/today/TodayPage";
-import { MapPage } from "@/routes/map/MapPage";
 import { SunMoonPage } from "@/routes/conditions/SunMoonPage";
 import { WindowsPage } from "@/routes/windows/WindowsPage";
 import { SpotsPage } from "@/routes/spots/SpotsPage";
 import { SettingsPage } from "@/routes/settings/SettingsPage";
 import { AdminPage } from "@/routes/admin/AdminPage";
+
+// MapLibre is by far the heaviest dependency in the app — /map is the only
+// route that pays for it (DEV_PLAN.md §5.6).
+const MapPage = lazy(() => import("@/routes/map/MapPage").then((m) => ({ default: m.MapPage })));
 
 // Charting (uPlot) is only pulled in by these routes — lazy so /  and other
 // non-charting pages stay near-instant (DEV_PLAN.md §5.6).

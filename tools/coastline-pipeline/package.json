@@ -1,0 +1,12 @@
+{
+  "name": "@fishmap/coastline-pipeline",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@turf/turf": "^7.1.0"
+  }
+}

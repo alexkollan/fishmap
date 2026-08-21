@@ -8,6 +8,16 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      // injectManifest (not the default generateSW) — the SW needs custom
+      // `push`/`notificationclick` handlers (src/sw.ts) for Web Push
+      // (DEV_PLAN.md §7.4). A payload the SW doesn't call showNotification()
+      // for is silently dropped, so generateSW's stock SW can't support this.
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
+      injectManifest: {
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest}"],
+      },
       includeAssets: ["icons/apple-touch-icon.png"],
       manifest: {
         name: "Ψαρέματα — Fishing conditions",
@@ -51,15 +61,20 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest}"],
-      },
     }),
   ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
     },
+  },
+  // MapLibre GL ships its own worker via a self-referencing `new URL(...)`;
+  // Vite's dep pre-bundling rewrites that reference and 404s it in dev
+  // (a known maplibre-gl + Vite interaction). Excluding it from
+  // optimizeDeps serves it straight from node_modules, where the worker
+  // URL resolves correctly.
+  optimizeDeps: {
+    exclude: ["maplibre-gl"],
   },
   server: {
     port: 5173,
