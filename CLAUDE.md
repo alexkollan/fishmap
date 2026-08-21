@@ -26,11 +26,14 @@ pnpm dev:api                         # apps/api dev server (tsx watch, :3001)
 
 pnpm typecheck                       # tsc --noEmit across all 4 packages
 pnpm build                           # production build of apps/web only (apps/api has no build step — see Architecture)
-pnpm test                            # vitest run across all packages — NOTE: no test files exist yet, this will currently report "no tests found"
+pnpm test                            # vitest run across all packages (packages/scoring + apps/api have real tests now)
 
 docker compose build                 # build api + web images
 docker compose up -d                 # run the stack locally (web on :48181, api on :3001)
 docker compose down
+
+node tools/coastline-pipeline/build.mjs   # regenerate apps/web/public/data/coastline.geojson — needs raw Natural
+                                           # Earth GeoJSON in a scratch dir first, see the Coastline data section below
 ```
 
 Single-package variants: `pnpm --filter @fishmap/web <script>`, `pnpm --filter @fishmap/api <script>`, etc. (package names: `@fishmap/web`, `@fishmap/api`, `@fishmap/types`, `@fishmap/scoring`).
@@ -44,7 +47,7 @@ Once test files exist: `pnpm --filter <package> exec vitest run <path>` for a si
 - `apps/web` — React 18 + Vite + TypeScript (strict), the PWA.
 - `apps/api` — Fastify, Node.
 - `packages/types`, `packages/scoring` — shared code, imported by both apps.
-- `tools/coastline-pipeline` — empty; Phase 4 of `DEV_PLAN.md` (OSM → vector tiles).
+- `tools/coastline-pipeline` — one-off build script (Natural Earth → segmented GeoJSON with per-segment aspect). Real workspace member now (`pnpm-workspace.yaml` has `tools/*`). See "Coastline data" below — this is *not* the OSM+tippecanoe MVT pipeline `DEV_PLAN.md` §5.1/Phase 4 describes.
 
 ### `packages/types` and `packages/scoring` have no build step — this is load-bearing
 
@@ -60,7 +63,47 @@ If either package ever needs a real build step (e.g. to ship a compiled artifact
 
 ### Route-level code splitting for `/map`
 
-Per `DEV_PLAN.md` §5.6, `/map` is meant to be the only route that pays for MapLibre's weight, loaded as a lazy chunk. As of Phase 1, `/map` is still a plain placeholder with a synchronous import — there is nothing heavy to lazy-load yet. When MapLibre is actually added (Phase 3), convert `MapPage` to a `React.lazy()` import; don't let map dependencies leak into the shared bundle.
+Per `DEV_PLAN.md` §5.6, `/map` is the only route that pays for MapLibre's weight — `App.tsx` loads `MapPage` via `React.lazy()`, same as the chart-using routes. Don't let anything under `apps/web/src/map/` get imported from a non-map route (that includes `useWeightProfiles`, which is fine — it's tiny and used everywhere — but not the MapLibre/worker code itself).
+
+### Coastline data — Natural Earth + GeoJSON, not OSM + tippecanoe
+
+`DEV_PLAN.md` §5.1/§10 Phase 4 specs an OSM extract → tippecanoe → MVT vector tile pipeline. **That's not what's built.** `tippecanoe` isn't installable in the environment this was built in (no sudo, not in the apt mirror without one; no `gdal`/`ogr2ogr` either as a fallback). Instead, `tools/coastline-pipeline/build.mjs`:
+
+1. Reads two pre-fetched GeoJSON files (Natural Earth 10m `ne_10m_coastline`/`ne_10m_land`, pulled from a GitHub mirror — the script does *not* fetch them itself, see the comments for the URLs) from a scratch directory.
+2. Clips to the Greek bbox, chunks into ~1.5 km segments via `@turf/turf`'s `lineChunk`.
+3. Computes each segment's seaward `aspectDeg` (bearing the segment faces the sea) by testing which perpendicular-to-the-segment direction lands in a land polygon.
+4. Also bakes each segment's nearest 0.25° `gridLat`/`gridLon` (matching `apps/api/src/lib/grid.ts`'s snap) directly onto its properties, so the client never has to compute that mapping.
+5. Writes `apps/web/public/data/coastline.geojson` — 8,965 features, ~430 KB gzipped.
+
+The map loads this as a single MapLibre GeoJSON source (`promoteId: "id"`) and recolors it entirely via `setFeatureState`, no vector tiles. This works and performs fine at the scale tested, but is lower-fidelity than real MVT tiles: coarser segments, no zoom-dependent level-of-detail (§5.3's LOD table isn't implemented — the same segment density renders at every zoom). If tippecanoe/gdal ever become available in the build environment, the real pipeline from §5.1 is the thing to build; don't treat this GeoJSON approach as the intended final state.
+
+### Map scoring pipeline (`apps/web/src/map/`)
+
+- `useCoastlineScoring.ts` owns the whole thing: loads the coastline once, tracks which 0.25° grid cells have been fetched, fetches only new cells intersecting the current (padded) viewport on `moveend`, feeds a Web Worker.
+- `scoring.worker.ts` is the only place in the app that scores more than one point at a time. It scores every segment × the current hour on `hourIndex`/`mode` change, and separately computes a sampled (≤150 segments) whole-week average for the scrubber's sparkline. It returns **every factor's score per segment**, not just the overall — switching the layer drawer's score-layer view is instant and needs no second worker round-trip.
+- Weather batching: `GET /api/weather/grid?points=lat,lon;lat,lon;...` (max 120 points/request server-side; the client chunks at 100 and fetches chunks in parallel). Scoring uses **nearest-grid-cell**, not the bilinear interpolation `DEV_PLAN.md` §5.2 describes — each segment's grid cell is baked in at pipeline build time and looked up directly. Simpler than bilinear; revisit if scores look blocky near grid-cell boundaries.
+- Wind scoring is aspect-relative **only on the map** (`windRelative()` in `packages/scoring` takes an `aspectDeg` param). Single-point pages have no coastline segment to source an aspect from and still score wind by speed alone — this is the plan's intended architecture, not a bug.
+- Resolved weight profiles (admin overrides, see below) reach the worker via a `"weights"` message posted whenever `useWeightProfiles()` resolves/changes.
+
+### Admin, feature flags, and the live weight editor
+
+`apps/api/src/lib/auth.ts` + `routes/admin.ts`: one hardcoded admin via `ADMIN_PASSWORD_HASH` (argon2id) → JWT in an httpOnly cookie. `/admin` sits outside `AppShell` in `App.tsx` (no bottom tabs, no location header — it's not part of the public app surface).
+
+**The live weight editor is genuinely live, app-wide, not just an admin preview.** `weight_overrides` rows (per mode) are merged with `DEFAULT_WEIGHT_PROFILES` behind a *public* `GET /api/weights`, and `apps/web/src/lib/weightProfiles.ts`'s `useWeightProfiles()` is what `useConditions`, the map worker, and `useBestWindows` actually score against — none of them import `DEFAULT_WEIGHT_PROFILES` directly for scoring anymore (packages/scoring still exports it as the fallback). If you add a new place that calls `scoreHour`, route its weight profile through `useWeightProfiles()`, not the static default, or an admin's edit silently won't apply there.
+
+Feature flags (`feature_flags` table, `GET /api/flags`, `useFlag()`) exist and work; only one flag (`windParticles`) is seeded, and nothing is actually gated behind it yet — no particle animation was built this session.
+
+### Translated factor notes — `noteKey`/`noteParams`, not raw strings
+
+`FactorScore.note` (in `packages/types`) is an **English-only fallback for non-UI consumers** (currently just the notification cron, which has no i18n layer). The UI never renders it directly. Every scoring factor (`packages/scoring/src/factors.ts`) and veto (`vetoes.ts`) also returns a `noteKey`/`noteParams` (or `VetoInfo.key`/`params`) — a translation key into `Dictionary.factorNotes`/`Dictionary.vetoes` plus interpolation values. `apps/web/src/lib/i18n/renderFactorNote.ts` does the lookup + `{param}` interpolation (two reserved param names, `phaseKey` and `monthKey`, get re-translated via `t.sunMoon.phase`/`t.common.months` instead of interpolated raw). Every UI surface that shows a factor's reasoning (`FactorBreakdown`, `TodayPage`, condition pages, the map's `SpotSheet`, `WindowsPage`) renders through this. If you add a new factor or veto branch, add both the English `note` (fallback) and a `noteKey`/params — a UI that falls back to `.note` for a new branch will silently show English regardless of locale, since `renderFactorNote`'s fallback-to-English is a deliberate "never blank" safety net, not a translation.
+
+### PWA service worker — `injectManifest`, not `generateSW`
+
+`vite-plugin-pwa` is configured with `strategies: "injectManifest"` and a custom source (`apps/web/src/sw.ts`), not the default `generateSW`. This is required, not a style choice: Web Push (`DEV_PLAN.md` §7.4) needs the service worker to call `showNotification()` in a `push` event listener, and the stock `generateSW` service worker has no such listener — a push payload it doesn't handle is silently dropped by the browser, no error anywhere. `sw.ts` adds `push` and `notificationclick` handlers alongside the standard `precacheAndRoute`. It's excluded from `apps/web/tsconfig.json`'s `include` (see the `exclude` entry) because `ServiceWorkerGlobalScope`/`PushEvent`/etc. aren't part of the DOM lib the rest of the app compiles against, and mixing DOM + WebWorker libs in one tsconfig causes global type conflicts — this doesn't affect the actual build, since vite-plugin-pwa bundles `sw.ts` independently via its own esbuild pass regardless of the app's tsconfig.
+
+### Local dev credentials — `apps/api/.env`
+
+Admin login, JWT signing, and Web Push all need env vars (`ADMIN_PASSWORD_HASH`, `JWT_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`) that `.env.example` always anticipated but nothing previously generated. `apps/api/.env` (gitignored) now has real dev values — dev admin password is `fishmap-dev-admin`. `apps/api/src/env.ts` is imported first (side-effect only, before `app.js`) in `server.ts` so `process.loadEnvFile()` runs before anything reads `process.env` — plain top-level code in `server.ts` before the `app.js` import would *not* work, since ESM hoists all `import` statements ahead of other top-level statements regardless of source order. **Treat the values in this `.env` as burned** before any real deployment — generate fresh ones rather than reusing what a coding session produced.
 
 ### i18n
 

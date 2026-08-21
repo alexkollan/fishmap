@@ -10,6 +10,6 @@ build/
 coverage/
 *.tsbuildinfo
 .vite/
-apps/api/data/*.sqlite*
+apps/api/data/
 tools/coastline-pipeline/output/
 tools/coastline-pipeline/cache/
