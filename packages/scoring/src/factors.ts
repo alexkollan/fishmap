@@ -40,31 +40,38 @@ const KMH_PER_KNOT = 1.852;
 // weight for shore/boat, near-zero for spearfishing (appetite-driven, not
 // visibility-driven).
 
+// Recalibrated 2026-08-22 against live feedback: the original curve made
+// "merely stable" (delta6h=0) score 68 — nearly "very good" — for a factor
+// that's supposed to be the single strongest predictor. A day with no
+// pressure signal either way is unremarkable, not good; only a genuine
+// falling trend should score well here. See PROGRESS.md's scoring
+// recalibration note for the full before/after rationale.
 function pressureCurveScore(delta3h: number, delta6h: number, absolute: number): number {
-  if (delta3h >= 2) return 20; // sharp post-frontal rise — the worst omen
+  if (delta3h >= 2) return 15; // sharp post-frontal rise — the worst omen
 
   const base = interpolateCurve(delta6h, [
     [-6, 100],
-    [-1, 82],
-    [0, 68],
-    [1, 55],
-    [3, 30],
+    [-2, 85],
+    [-1, 68],
+    [0, 50],
+    [1, 35],
+    [3, 18],
   ]);
 
-  if (absolute < 1005) return Math.min(base, 30); // storm-adjacent
-  if (absolute > 1022 && Math.abs(delta6h) < 0.5) return Math.min(base, 45); // stable high, lethargic
+  if (absolute < 1005) return Math.min(base, 25); // storm-adjacent
+  if (absolute > 1022 && Math.abs(delta6h) < 0.5) return Math.min(base, 38); // stable high, lethargic
   return base;
 }
 
 export function pressureTrend(hourly: WeatherHour[], index: number): RawFactor {
   const current = hourly[index]?.pressureMsl;
   if (current === undefined) {
-    return factor("pressure", 50, "No pressure data available.", "pressure.noData");
+    return factor("pressure", 42, "No pressure data available.", "pressure.noData");
   }
   const at3h = index >= 3 ? hourly[index - 3]?.pressureMsl : undefined;
   const at6h = index >= 6 ? hourly[index - 6]?.pressureMsl : undefined;
   if (at3h === undefined || at6h === undefined) {
-    return factor("pressure", 65, "Not enough history yet — treating pressure as stable.", "pressure.noHistory");
+    return factor("pressure", 50, "Not enough history yet — treating pressure as stable.", "pressure.noHistory");
   }
 
   const delta3h = current - at3h;
@@ -100,7 +107,7 @@ export function pressureTrend(hourly: WeatherHour[], index: number): RawFactor {
 // and fall back to speed-only scoring, same as before.
 
 function shoreWindScore(speedKmh: number, isDay: boolean): number {
-  if (speedKmh < 5) return isDay ? 45 : 65;
+  if (speedKmh < 5) return isDay ? 35 : 55;
   return interpolateCurve(speedKmh, [
     [5, 60],
     [12, 95],
@@ -111,11 +118,14 @@ function shoreWindScore(speedKmh: number, isDay: boolean): number {
 }
 
 function boatWindScore(speedKmh: number): number {
+  // Recalibrated 2026-08-22: dead calm is comfortable but not itself a
+  // reason to expect good fishing — the old 85 floor made "no wind at all"
+  // read as nearly excellent regardless of anything else.
   return interpolateCurve(speedKmh, [
-    [0, 85],
-    [15, 100],
-    [25, 70],
-    [30, 40],
+    [0, 55],
+    [15, 92],
+    [25, 65],
+    [30, 38],
     [40, 15],
   ]);
 }
@@ -149,7 +159,7 @@ function classifyRelation(angle: number): ShoreRelation {
 // the water, and the veto thresholds (checked separately in vetoes.ts) are
 // direction-dependent — onshore gets dangerous far sooner than offshore.
 function shoreWindScoreWithAspect(speedKmh: number, relation: ShoreRelation, isDay: boolean): number {
-  if (speedKmh < 5) return isDay ? 45 : 65;
+  if (speedKmh < 5) return isDay ? 35 : 55;
   if (relation === "onshore") {
     return interpolateCurve(speedKmh, [
       [5, 65],
@@ -179,7 +189,7 @@ function shoreWindScoreWithAspect(speedKmh: number, relation: ShoreRelation, isD
 
 export function windRelative(wx: WeatherHour, mode: Mode, aspectDeg?: number): RawFactor {
   const speed = wx.windSpeed10m;
-  if (speed === undefined) return factor("wind", 50, "No wind data available.", "wind.noData");
+  if (speed === undefined) return factor("wind", 42, "No wind data available.", "wind.noData");
 
   const speedParam = Math.round(speed);
 
@@ -215,39 +225,50 @@ export function windRelative(wx: WeatherHour, mode: Mode, aspectDeg?: number): R
 }
 
 // --- 4.3 Waves --------------------------------------------------------------
+// Recalibrated 2026-08-22: 0.2-0.4m chop is the Aegean's default summer
+// state, not a special occasion — the old curve maxed out at 90-100 across
+// nearly that whole band, which meant "waves" was almost always reading
+// as excellent regardless of whether the day actually had anything going
+// for it. The peak is narrower now and the common "flat-ish, nothing
+// wrong with it" range reads as decent-but-unremarkable (65-80), not
+// automatically excellent.
 
 function shoreWaveScore(h: number): number {
   return interpolateCurve(h, [
-    [0, 50],
-    [0.2, 90],
-    [0.45, 100],
-    [0.7, 90],
-    [1.2, 60],
-    [1.5, 30],
+    [0, 35],
+    [0.15, 60],
+    [0.3, 78],
+    [0.45, 92],
+    [0.6, 78],
+    [0.9, 55],
+    [1.2, 35],
+    [1.5, 18],
   ]);
 }
 
 function boatWaveScore(h: number): number {
   return interpolateCurve(h, [
-    [0, 100],
-    [0.5, 95],
-    [1.0, 75],
-    [1.5, 45],
-    [2.0, 15],
+    [0, 85],
+    [0.3, 92],
+    [0.6, 80],
+    [1.0, 60],
+    [1.5, 35],
+    [2.0, 12],
   ]);
 }
 
 function spearWaveScore(h: number): number {
   return interpolateCurve(h, [
-    [0, 100],
-    [0.2, 90],
-    [0.5, 40],
+    [0, 95],
+    [0.15, 82],
+    [0.3, 55],
+    [0.5, 28],
   ]);
 }
 
 export function waveConditions(wx: WeatherHour, mode: Mode): RawFactor {
   const h = wx.waveHeight;
-  if (h === undefined) return factor("waves", 50, "No wave data available near this point.", "waves.noData");
+  if (h === undefined) return factor("waves", 42, "No wave data available near this point.", "waves.noData");
   const score = mode === "boat" ? boatWaveScore(h) : mode === "spearfishing" ? spearWaveScore(h) : shoreWaveScore(h);
   return factor("waves", score, `${h.toFixed(1)} m wave height.`, "waves.height", { height: Math.round(h * 10) / 10 });
 }
@@ -264,7 +285,7 @@ function sumPrecip(hourly: WeatherHour[], index: number, hours: number): number 
 
 export function turbidity(hourly: WeatherHour[], index: number, mode: Mode): RawFactor {
   const wx = hourly[index];
-  if (!wx) return factor("turbidity", 50, "No data available.", "turbidity.noData");
+  if (!wx) return factor("turbidity", 42, "No data available.", "turbidity.noData");
 
   const waveComponent =
     wx.waveHeight !== undefined && wx.wavePeriod !== undefined
@@ -275,20 +296,22 @@ export function turbidity(hourly: WeatherHour[], index: number, mode: Mode): Raw
   const turbid = clamp(waveComponent * 0.6 + rainComponent * 0.4, 0, 1);
 
   // Same input, opposite sign by mode (§4.4): murky is cover for shore/boat
-  // predator fishing, catastrophic for spearfishing visibility.
+  // predator fishing, catastrophic for spearfishing visibility. Recalibrated
+  // 2026-08-22: plain clear water isn't itself a reason to expect a good
+  // day for shore/boat, so it no longer reads as a default-positive 60.
   const score =
     mode === "spearfishing"
       ? interpolateCurve(turbid, [
-          [0, 100],
-          [0.3, 60],
-          [0.6, 25],
+          [0, 95],
+          [0.3, 55],
+          [0.6, 22],
           [1, 5],
         ])
       : interpolateCurve(turbid, [
-          [0, 60],
-          [0.3, 80],
-          [0.6, 70],
-          [1, 40],
+          [0, 45],
+          [0.3, 68],
+          [0.6, 58],
+          [1, 32],
         ]);
 
   const noteKey = turbid < 0.3 ? "turbidity.clear" : turbid < 0.6 ? "turbidity.some" : "turbidity.murky";
@@ -301,7 +324,7 @@ export function turbidity(hourly: WeatherHour[], index: number, mode: Mode): Raw
 export function seaTempFactor(hourly: WeatherHour[], index: number): RawFactor {
   const wx = hourly[index];
   const sst = wx?.seaSurfaceTemperature;
-  if (sst === undefined) return factor("seaTemp", 50, "No sea temperature data available.", "seaTemp.noData");
+  if (sst === undefined) return factor("seaTemp", 42, "No sea temperature data available.", "seaTemp.noData");
 
   const idx48hAgo = index - 48;
   const sst48hAgo = idx48hAgo >= 0 ? hourly[idx48hAgo]?.seaSurfaceTemperature : undefined;
@@ -311,32 +334,40 @@ export function seaTempFactor(hourly: WeatherHour[], index: number): RawFactor {
     if (delta <= -2) {
       return factor(
         "seaTemp",
-        25,
+        20,
         `Sea temperature dropped ${Math.abs(delta).toFixed(1)}°C in 48h — bite likely shut down.`,
         "seaTemp.dropped",
         { delta: Math.round(Math.abs(delta) * 10) / 10 },
       );
     }
     if (delta >= 0.5) {
-      return factor("seaTemp", 75, `Gently warming (+${delta.toFixed(1)}°C/48h).`, "seaTemp.warming", {
+      return factor("seaTemp", 68, `Gently warming (+${delta.toFixed(1)}°C/48h).`, "seaTemp.warming", {
         delta: Math.round(delta * 10) / 10,
       });
     }
   }
 
+  // Recalibrated 2026-08-22: absolute SST alone (no delta signal) is now a
+  // genuinely middling contributor — a normal, unremarkable-but-fine
+  // summer temperature shouldn't read as a reason the day is "good."
   const score = interpolateCurve(sst, [
-    [12, 55],
-    [16, 65],
-    [22, 70],
-    [26, 60],
-    [29, 45],
+    [12, 42],
+    [16, 50],
+    [22, 55],
+    [26, 46],
+    [29, 34],
   ]);
   return factor("seaTemp", score, `${sst.toFixed(1)}°C sea surface temperature.`, "seaTemp.value", { sst: Math.round(sst * 10) / 10 });
 }
 
 // --- 4.6/4.7 Light window (time-of-day × cloud, multiplicative) -------------
 
-function timeOfDayBase(tMs: number, sun: SunTimes, isDay: 0 | 1 | undefined, mode: Mode): { score: number; noteKey: string } {
+function timeOfDayBase(
+  tMs: number,
+  sun: SunTimes,
+  isDay: 0 | 1 | undefined,
+  mode: Mode,
+): { score: number; noteKey: string; isLowLightAlready: boolean } {
   if (mode === "spearfishing") {
     const solarNoon = Date.parse(sun.solarNoon);
     const hoursFromNoon = Number.isNaN(solarNoon) ? 6 : Math.abs(tMs - solarNoon) / HOUR_MS;
@@ -346,34 +377,35 @@ function timeOfDayBase(tMs: number, sun: SunTimes, isDay: 0 | 1 | undefined, mod
       [6, 45],
       [9, 15],
     ]);
-    return { score, noteKey: "light.spearMidday" };
+    return { score, noteKey: "light.spearMidday", isLowLightAlready: false };
   }
 
   const sunrise = Date.parse(sun.sunrise);
   const sunset = Date.parse(sun.sunset);
-  if (!Number.isNaN(sunrise) && isWithinDawnWindow(tMs, sunrise)) return { score: 100, noteKey: "light.dawn" };
-  if (!Number.isNaN(sunset) && isWithinDuskWindow(tMs, sunset)) return { score: 100, noteKey: "light.dusk" };
-  if (isDay === 0) return { score: 65, noteKey: "light.night" };
+  if (!Number.isNaN(sunrise) && isWithinDawnWindow(tMs, sunrise)) return { score: 100, noteKey: "light.dawn", isLowLightAlready: true };
+  if (!Number.isNaN(sunset) && isWithinDuskWindow(tMs, sunset)) return { score: 100, noteKey: "light.dusk", isLowLightAlready: true };
+  // Recalibrated 2026-08-22: both baselines lowered so "not dawn/dusk"
+  // reads as genuinely unremarkable rather than a near-default positive.
+  if (isDay === 0) return { score: 52, noteKey: "light.night", isLowLightAlready: true };
 
   const solarNoon = Date.parse(sun.solarNoon);
   const hoursFromNoon = Number.isNaN(solarNoon) ? 6 : Math.abs(tMs - solarNoon) / HOUR_MS;
   const score = interpolateCurve(hoursFromNoon, [
-    [0, 25],
-    [3, 45],
-    [6, 75],
+    [0, 18],
+    [3, 35],
+    [6, 58],
   ]);
-  return { score, noteKey: "light.daytime" };
+  return { score, noteKey: "light.daytime", isLowLightAlready: false };
 }
 
 export function lightWindow(wx: WeatherHour, sun: SunTimes, mode: Mode): RawFactor {
   const tMs = Date.parse(wx.time);
-  const { score: base, noteKey: baseKey } = timeOfDayBase(tMs, sun, wx.isDay, mode);
+  const { score: base, noteKey: baseKey, isLowLightAlready } = timeOfDayBase(tMs, sun, wx.isDay, mode);
 
   let score = base;
   let noteKey = baseKey;
   let note = baseKey.replace("light.", "");
   if (wx.cloudCover !== undefined && mode !== "spearfishing") {
-    const isLowLightAlready = base >= 65;
     const multiplier = isLowLightAlready
       ? 1 + clamp(wx.cloudCover / 100, 0, 1) * 0.08
       : wx.cloudCover >= 60
@@ -395,15 +427,18 @@ export function lightWindow(wx: WeatherHour, sun: SunTimes, mode: Mode): RawFact
 
 export function precipitationFactor(wx: WeatherHour): RawFactor {
   const p = wx.precipitation;
-  if (p === undefined) return factor("precipitation", 65, "No precipitation data available.", "precipitation.noData");
+  if (p === undefined) return factor("precipitation", 42, "No precipitation data available.", "precipitation.noData");
+  // Recalibrated 2026-08-22: no rain is genuinely neutral, not a reason to
+  // expect a good day on its own — the old 65 baseline alone was already
+  // inside the "Good" band before any other factor was considered.
   const score = interpolateCurve(p, [
-    [0, 65],
-    [0.1, 85],
-    [2, 85],
-    [2.01, 65],
-    [8, 65],
-    [8.01, 35],
-    [20, 20],
+    [0, 48],
+    [0.1, 82],
+    [2, 82],
+    [2.01, 55],
+    [8, 55],
+    [8.01, 30],
+    [20, 15],
   ]);
   return factor("precipitation", score, `${p.toFixed(1)} mm/h.`, "precipitation.value", { mm: Math.round(p * 10) / 10 });
 }
@@ -427,14 +462,21 @@ export function describeMoonPhase(phase: number): string {
   return "waningCrescent";
 }
 
+// Recalibrated 2026-08-22: solunar windows cover something like a third to
+// half of every day (several ~2h major/minor windows per 24h), so the old
+// 75/90 bump for merely being inside one made this factor read as "good to
+// excellent" far too often to be a meaningful signal. It's contested
+// science to begin with (see the note above) — the twilight-aligned case
+// stays the one genuinely exceptional signal; a plain active window now
+// reads as a modest, not a decisive, bump.
 export function solunarFactor(wx: WeatherHour, sunMoon: SunMoonData): RawFactor {
   const tMs = Date.parse(wx.time);
   const activeWindow = sunMoon.solunar.find((w) => tMs >= Date.parse(w.start) && tMs <= Date.parse(w.end));
 
   const phaseDistanceFromExtreme = Math.min(sunMoon.moon.phase, 1 - sunMoon.moon.phase) * 2; // 0 new/full, 1 quarter
   const phaseScore = interpolateCurve(phaseDistanceFromExtreme, [
-    [0, 85],
-    [1, 60],
+    [0, 65],
+    [1, 40],
   ]);
   const phaseKey = describeMoonPhase(sunMoon.moon.phase);
 
@@ -443,7 +485,7 @@ export function solunarFactor(wx: WeatherHour, sunMoon: SunMoonData): RawFactor 
     return factor("solunar", score, `Moon ${phaseKey}.`, "solunar.phase", { phaseKey });
   }
 
-  score = Math.max(score, activeWindow.type === "major" ? 90 : 75);
+  score = Math.max(score, activeWindow.type === "major" ? 68 : 55);
   if (activeWindow.alignsWithTwilight) {
     return factor(
       "solunar",
@@ -471,27 +513,27 @@ export function solunarFactor(wx: WeatherHour, sunMoon: SunMoonData): RawFactor 
 
 function shoreOrBoatCurrentScore(knots: number): number {
   return interpolateCurve(knots, [
-    [0, 45],
-    [0.05, 45],
-    [0.2, 90],
-    [0.8, 90],
-    [2, 50],
-    [3, 35],
+    [0, 38],
+    [0.05, 38],
+    [0.2, 85],
+    [0.8, 85],
+    [2, 45],
+    [3, 30],
   ]);
 }
 
 function spearCurrentScore(knots: number): number {
   return interpolateCurve(knots, [
-    [0, 90],
-    [0.15, 80],
-    [0.4, 45],
-    [1, 20],
+    [0, 85],
+    [0.15, 72],
+    [0.4, 38],
+    [1, 15],
   ]);
 }
 
 export function currentFactor(wx: WeatherHour, mode: Mode): RawFactor {
   const kmh = wx.oceanCurrentVelocity;
-  if (kmh === undefined) return factor("current", 50, "No current data available.", "current.noData");
+  if (kmh === undefined) return factor("current", 42, "No current data available.", "current.noData");
   const knots = kmh / KMH_PER_KNOT;
   const score = mode === "spearfishing" ? spearCurrentScore(knots) : shoreOrBoatCurrentScore(knots);
   const knotsParam = Math.round(knots * 100) / 100;
@@ -509,7 +551,10 @@ export function currentFactor(wx: WeatherHour, mode: Mode): RawFactor {
 
 // --- 4.11 Seasonality (v1: coarse month + SST, no species) -------------------
 
-const MONTH_BASE = [45, 40, 42, 55, 60, 62, 58, 58, 75, 80, 75, 55]; // Jan..Dec
+// Recalibrated 2026-08-22: compressed down ~13-15pts across the board so an
+// ordinary month doesn't quietly push every score toward "good" on its own
+// — autumn peak and winter trough keep their shape, just off a lower floor.
+const MONTH_BASE = [32, 27, 29, 42, 47, 48, 44, 44, 60, 66, 60, 42]; // Jan..Dec
 
 export function seasonality(wx: WeatherHour): RawFactor {
   const date = new Date(wx.time);

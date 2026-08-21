@@ -10,6 +10,26 @@ Purpose: let any Claude Code session (or human) pick up this project cold and kn
 
 ---
 
+## Scoring recalibration (2026-08-22)
+
+Live feedback after Phases 1–8: the score almost never left the 55-80 range regardless of how the day actually looked — a genuinely unremarkable, nothing-going-for-it day (dead calm, bluebird midday, stable high pressure) still scored 64 ("Good"). Measured with a probe script before touching anything: the root cause was that most individual factor curves had "neutral/no-signal" baselines set too high (waves defaulted to 90-100 across the entire 0.2-0.7m band, which is the Aegean's ordinary summer state, not a special occasion; solunar bumped to 75-90 for merely being inside one of the several ~2h windows every day covers; pressure's "stable" case scored 68; precipitation's "no rain" baseline was 65 — already inside the "Good" band on its own). Averaged across 10 factors, these generous floors meant a day rarely read as anything but "Good."
+
+Recalibrated in `packages/scoring/src/factors.ts` (see the `Recalibrated 2026-08-22` comments at each site): lowered neutral/no-data baselines across pressure, waves, turbidity, seaTemp, precipitation, solunar, current, seasonality, and calm-wind (shore + boat), and narrowed the wave "sweet spot" so ordinary chop no longer auto-maxes. The twilight-aligned solunar case and genuine falling-pressure/onshore-breeze cases still score high — what changed is that *merely adequate* conditions across the board no longer average up to "Good" by default.
+
+Before/after on a probe script (not committed — ad hoc, reproducible from the scenarios described here) scoring realistic hand-built weather series in shore mode:
+
+| Scenario | Before | After |
+|---|---|---|
+| Dead calm, bluebird midday, stable high pressure (genuinely bad) | 64 (Good) | 40 (Fair) |
+| Totally unremarkable, nothing wrong or special | 64 (Good) | 58 (Good) |
+| Real falling pressure, onshore breeze, dusk, overcast (genuinely great) | 78 (Very good) | 79 (Very good) |
+| Every factor stacked favorably at once | — | 83 (Very good) |
+| Sharp post-frontal rise, dead calm, bluebird, winter (no veto) | — | 39 (Fair) |
+
+Boat mode's calm-wind floor (85, nearly excellent for zero wind) got the same treatment (→55). Spearfishing wasn't touched — its turbidity-dominated scoring already discriminated well (20 vs 74 on bad/great probes) without changes. Vetoes and the 0-100 band cutoffs (`apps/web/src/lib/score.ts`) are unchanged; this was a curve-shape fix, not a threshold fix.
+
+Existing scoring tests (`packages/scoring/src/score.test.ts`) don't assert specific score values (only 0-100 bounds and veto presence), so they needed no changes and still pass. This is exactly the kind of tuning `DEV_PLAN.md` §12 anticipated ("assume v1 weights are a hypothesis, not truth") — the admin live weight editor (Phase 7) still lets Alex retune weights per-mode on top of this without touching code, but the underlying curve shapes needed a code change since the old floors were structural, not a weighting problem.
+
 ## Current state (as of 2026-08-21)
 
 **Phases 1–8 (all of `DEV_PLAN.md` §10) are done and verified live** via real Playwright sessions against both dev servers, in both languages, screenshots inspected — not just typecheck/build. This was one long session that took the app from "Phase 2 complete, map not started" to feature-complete end to end. The biggest deviation from the plan is Phase 4: no tippecanoe/MVT pipeline (see below) — everything else matches `DEV_PLAN.md` in substance, with pragmatic scope calls flagged throughout.
