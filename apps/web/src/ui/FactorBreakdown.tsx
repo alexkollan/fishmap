@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { FactorScore } from "@fishmap/types";
 import { useI18n } from "@/lib/i18n";
+import { renderFactorNote } from "@/lib/i18n/renderFactorNote";
 import { scoreColor } from "@/lib/score";
 
 interface FactorBreakdownProps {
@@ -37,7 +38,7 @@ export function FactorBreakdown({ factors, limit, expandable }: FactorBreakdownP
           <li key={f.key} className="flex flex-col gap-1">
             <div className="flex items-baseline justify-between gap-2 text-sm">
               <span className="font-medium text-ink">{factorLabels[f.key] ?? f.key}</span>
-              <span className="text-right text-ink-muted">{f.note}</span>
+              <span className="text-right text-ink-muted">{renderFactorNote(t, f)}</span>
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
               <div

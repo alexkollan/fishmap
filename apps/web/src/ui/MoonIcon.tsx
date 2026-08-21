@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { useI18n } from "@/lib/i18n";
 
 interface MoonIconProps {
   phase: number; // 0 = new, 0.5 = full (SunCalc convention)
@@ -11,6 +12,7 @@ interface MoonIconProps {
 // same side as the outer limb pre-quarter (crescent, subtracting) and the
 // opposite side post-quarter (gibbous, adding).
 export function MoonIcon({ phase, size = 72 }: MoonIconProps) {
+  const { t } = useI18n();
   const clipId = useId();
   const r = size / 2;
   const theta = phase * Math.PI * 2;
@@ -22,7 +24,7 @@ export function MoonIcon({ phase, size = 72 }: MoonIconProps) {
   const d = `M ${r},0 A ${r},${r} 0 0 ${outerSweep} ${r},${size} A ${rx},${r} 0 0 ${terminatorSweep} ${r},0`;
 
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label="Moon phase">
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={t.sunMoon.moonPhaseLabel}>
       <defs>
         <clipPath id={clipId}>
           <circle cx={r} cy={r} r={r} />

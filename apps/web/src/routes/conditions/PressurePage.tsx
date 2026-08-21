@@ -1,6 +1,7 @@
 import { useActiveLocation } from "@/location/useActiveLocation";
 import { useModeStore } from "@/lib/mode/store";
 import { useI18n } from "@/lib/i18n";
+import { renderFactorNote } from "@/lib/i18n/renderFactorNote";
 import { useConditions, chartWindow, type HourlyConditions } from "@/lib/weather/useConditions";
 import { ConditionsGate } from "@/ui/ConditionsGate";
 import { ConditionPageLayout } from "@/ui/ConditionPageLayout";
@@ -46,7 +47,7 @@ function PressureContent({ locationName, bundle }: { locationName: string; bundl
       title={t.nav.conditions.pressure}
       locationLine={`${locationName} · ${bundle.series.latitude.toFixed(3)}, ${bundle.series.longitude.toFixed(3)}`}
       headline={current.pressureMsl !== undefined ? `${current.pressureMsl.toFixed(1)} ${t.pressure.hpa}` : "—"}
-      summary={pressureFactor?.note ?? ""}
+      summary={pressureFactor ? renderFactorNote(t, pressureFactor) : ""}
       meaning={<p>{t.pressure.explanation}</p>}
     >
       <div className="flex flex-col gap-3">

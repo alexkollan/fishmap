@@ -1,6 +1,7 @@
 import { useActiveLocation } from "@/location/useActiveLocation";
 import { useModeStore } from "@/lib/mode/store";
 import { useI18n } from "@/lib/i18n";
+import { renderFactorNote } from "@/lib/i18n/renderFactorNote";
 import { useConditions, chartWindow } from "@/lib/weather/useConditions";
 import { ConditionsGate } from "@/ui/ConditionsGate";
 import { ConditionPageLayout } from "@/ui/ConditionPageLayout";
@@ -29,7 +30,7 @@ function WindContent({ locationName, bundle }: { locationName: string; bundle: N
       title={t.nav.conditions.wind}
       locationLine={`${locationName} · ${bundle.series.latitude.toFixed(3)}, ${bundle.series.longitude.toFixed(3)}`}
       headline={current.windSpeed10m !== undefined ? `${current.windSpeed10m.toFixed(0)} km/h` : "—"}
-      summary={windFactor?.note ?? ""}
+      summary={windFactor ? renderFactorNote(t, windFactor) : ""}
       meaning={<p>{t.wind.explanation}</p>}
     >
       <LineChart

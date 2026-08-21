@@ -1,6 +1,7 @@
 import { useActiveLocation } from "@/location/useActiveLocation";
 import { useModeStore } from "@/lib/mode/store";
 import { useI18n } from "@/lib/i18n";
+import { renderFactorNote } from "@/lib/i18n/renderFactorNote";
 import { useConditions, chartWindow } from "@/lib/weather/useConditions";
 import { ConditionsGate } from "@/ui/ConditionsGate";
 import { ConditionPageLayout } from "@/ui/ConditionPageLayout";
@@ -37,7 +38,7 @@ function SeaContent({ locationName, bundle }: { locationName: string; bundle: No
           <p>{t.sea.explanation}</p>
           {turbidityFactor && (
             <p className="mt-2">
-              {t.sea.clarity}: {turbidityFactor.note}
+              {t.sea.clarity}: {renderFactorNote(t, turbidityFactor)}
             </p>
           )}
         </>

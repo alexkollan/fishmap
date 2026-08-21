@@ -3,6 +3,7 @@ import type { FactorScore } from "@fishmap/types";
 import { useActiveLocation } from "@/location/useActiveLocation";
 import { useModeStore } from "@/lib/mode/store";
 import { useI18n } from "@/lib/i18n";
+import { renderFactorNote, renderVetoNote } from "@/lib/i18n/renderFactorNote";
 import { useConditions, type HourlyConditions } from "@/lib/weather/useConditions";
 import { formatLocalTime } from "@/lib/formatTime";
 import { ConditionsGate } from "@/ui/ConditionsGate";
@@ -29,9 +30,9 @@ function findNextGoodWindow(hours: HourlyConditions[], nowIndex: number): Hourly
   return best;
 }
 
-function topFactorNote(factors: FactorScore[]): string | null {
+function topFactor(factors: FactorScore[]): FactorScore | null {
   const ranked = [...factors].sort((a, b) => Math.abs(b.score - 50) * b.weight - Math.abs(a.score - 50) * a.weight);
-  return ranked[0]?.note ?? null;
+  return ranked[0] ?? null;
 }
 
 export function TodayPage() {
@@ -57,7 +58,8 @@ function TodayContent({
   const { t, locale } = useI18n();
   const { result } = bundle.now;
   const nextGood = findNextGoodWindow(bundle.hours, bundle.nowIndex);
-  const verdict = topFactorNote(result.factors);
+  const topFactorForVerdict = topFactor(result.factors);
+  const verdict = topFactorForVerdict ? renderFactorNote(t, topFactorForVerdict) : null;
 
   return (
     <div className="flex flex-col gap-6 px-4 py-6">
@@ -67,7 +69,7 @@ function TodayContent({
         <div className="rounded-md border border-score-bad/30 bg-score-bad/10 px-3 py-2 text-sm text-score-bad">
           <p className="mb-1 font-medium">{t.score.activeVetoes}</p>
           {result.vetoes.map((v) => (
-            <p key={v}>{v}</p>
+            <p key={v.key}>{renderVetoNote(t, v)}</p>
           ))}
         </div>
       )}
