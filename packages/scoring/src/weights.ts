@@ -19,49 +19,64 @@ import type { Mode, WeightProfile } from "@fishmap/types";
 //   independent sources — not yet possible to score (no coastline aspect
 //   until Phase 4), flagged honestly in the factor's note rather than
 //   pretending the curve is complete.
+//
+// Rebalanced 2026-08-22, on top of the same day's curve recalibration
+// (see factors.ts / PROGRESS.md): even with harsher curves, live-tested
+// conditions still leaned generous because the two most evidence-backed
+// factors — pressure (top predictor per the tagging studies above) and
+// light/time-of-day (DEV_PLAN.md §4.6 calls this "the strongest single
+// predictor," full stop) — weren't actually weighted like it. A real case
+// caught this directly: a midnight spearfishing check scored 69 ("Good")
+// because clear, calm water outweighted the fact that it was pitch dark —
+// light was only ~11% of spearfishing's total weight. Pushed pressure and
+// light up everywhere; pulled down solunar (explicitly contested science,
+// see above — it shouldn't be competing with pressure for influence) and
+// current (a real but secondary signal) to make room. Seasonality also
+// moved up — it's a legitimate grounding signal that was underweighted
+// relative to how much it now discriminates after the curve recalibration.
 export const DEFAULT_WEIGHT_PROFILES: Record<Mode, WeightProfile> = {
   shore: {
     mode: "shore",
     weights: {
-      pressure: 20,
-      wind: 16,
-      waves: 14,
-      turbidity: 8,
-      seaTemp: 8,
-      light: 18,
-      precipitation: 6,
-      solunar: 10,
-      current: 6,
-      seasonality: 6,
+      pressure: 24,
+      wind: 15,
+      waves: 13,
+      turbidity: 7,
+      seaTemp: 10,
+      light: 20,
+      precipitation: 5,
+      solunar: 6,
+      current: 5,
+      seasonality: 9,
     },
   },
   boat: {
     mode: "boat",
     weights: {
-      pressure: 18,
-      wind: 20,
-      waves: 16,
-      turbidity: 4,
-      seaTemp: 8,
-      light: 14,
-      precipitation: 6,
-      solunar: 8,
-      current: 8,
-      seasonality: 6,
+      pressure: 22,
+      wind: 18,
+      waves: 14,
+      turbidity: 3,
+      seaTemp: 10,
+      light: 16,
+      precipitation: 5,
+      solunar: 5,
+      current: 6,
+      seasonality: 9,
     },
   },
   spearfishing: {
     mode: "spearfishing",
     weights: {
       pressure: 2,
-      wind: 14,
-      waves: 20,
-      turbidity: 25,
+      wind: 12,
+      waves: 15,
+      turbidity: 19,
       seaTemp: 6,
-      light: 10,
+      light: 20,
       precipitation: 4,
       solunar: 3,
-      current: 8,
+      current: 7,
       seasonality: 5,
     },
   },

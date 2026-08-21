@@ -30,6 +30,24 @@ Boat mode's calm-wind floor (85, nearly excellent for zero wind) got the same tr
 
 Existing scoring tests (`packages/scoring/src/score.test.ts`) don't assert specific score values (only 0-100 bounds and veto presence), so they needed no changes and still pass. This is exactly the kind of tuning `DEV_PLAN.md` §12 anticipated ("assume v1 weights are a hypothesis, not truth") — the admin live weight editor (Phase 7) still lets Alex retune weights per-mode on top of this without touching code, but the underlying curve shapes needed a code change since the old floors were structural, not a weighting problem.
 
+### Follow-up: weight rebalancing (same day)
+
+Curve recalibration alone wasn't quite enough — checking real live conditions (`GET /api/weather`, scored through `scoreHour` directly) turned up a concrete case: a midnight spearfishing check scored 69 ("Good") because `turbidity`/`waves`/`wind` all happened to read excellent (calm, clear water) and `light` — correctly reading 15 for pitch dark — was only ~11% of spearfishing's total weight, too little to overrule the other three. Same root issue as the curve problem, different mechanism: the two most evidence-backed factors (`pressure`, and `light`/time-of-day — DEV_PLAN.md §4.6 calls light "the strongest single predictor") weren't weighted like it, while `solunar` (explicitly flagged in `factors.ts` as contested science) and `current` carried more influence than their evidence quality justifies.
+
+Rebalanced `DEFAULT_WEIGHT_PROFILES` in `packages/scoring/src/weights.ts` (all three modes): pressure and light both moved up meaningfully, seasonality moved up (it was underweighted relative to how well it now discriminates post-recalibration), solunar and current moved down. Spearfishing's `light` weight roughly doubled (10→20, now tied for spearfishing's single highest weight alongside turbidity) specifically because of the midnight case above.
+
+Effect, live Athens conditions at the time of the change (stable pressure, clear calm night, 27°C SST, August):
+
+| Mode | Before rebalance | After |
+|---|---|---|
+| Shore | 50 | 51 (flat — wasn't the problem case here) |
+| Boat | 58 | 58 (flat) |
+| Spearfishing (the midnight case) | 69 (Good) | 60 (Good, but meaningfully closer to Fair) |
+
+And on the synthetic scenarios from the curve-recalibration table above: the genuinely great shore day actually moved *up* (79→81, since pressure/light being weighted higher rewards real alignment on those too, not just punishes their absence), the bad/mediocre shore days stayed roughly flat (38, 57) — confirming the rebalance sharpens discrimination rather than just dragging everything down uniformly.
+
+Spearfishing's midnight case (60) is better but still lands in "Good," not "Fair" — `turbidity`+`waves`+`wind` together are still ~49% of spearfishing's weight even after trimming, partly by design (DEV_PLAN.md explicitly calls turbidity spearfishing's single highest-priority factor, citing diver forums ranking visibility above even wave height/safety — this rebalance trimmed that citation-backed weighting rather than discarding it). If a real outing confirms night spearfishing should score lower than this even with flat clear water, the next lever is pushing spearfishing's `light` weight further, or adding a low-light penalty specific to spearfishing rather than relying on weight alone — flagged here rather than pre-emptively guessed at, since it depends on how the app's real users actually spearfish at night (some genuinely do with torches).
+
 ## Current state (as of 2026-08-21)
 
 **Phases 1–8 (all of `DEV_PLAN.md` §10) are done and verified live** via real Playwright sessions against both dev servers, in both languages, screenshots inspected — not just typecheck/build. This was one long session that took the app from "Phase 2 complete, map not started" to feature-complete end to end. The biggest deviation from the plan is Phase 4: no tippecanoe/MVT pipeline (see below) — everything else matches `DEV_PLAN.md` in substance, with pragmatic scope calls flagged throughout.
