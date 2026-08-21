@@ -68,6 +68,9 @@ export interface Dictionary {
     seeForecast: string;
     sunMoonStrip: string;
     topFactors: string;
+    topFactorsCaption: string;
+    showAllFactors: string;
+    showFewerFactors: string;
   };
   forecast: {
     hourly: string;
@@ -196,6 +199,9 @@ export const dictionaries: Record<Locale, Dictionary> = {
       seeForecast: "See 7-day forecast",
       sunMoonStrip: "Sun & moon",
       topFactors: "What's driving this",
+      topFactorsCaption: "Every factor below is computed for every fishing mode — only the weight changes.",
+      showAllFactors: "Show all {count} factors",
+      showFewerFactors: "Show fewer",
     },
     forecast: {
       hourly: "Hourly",
@@ -326,6 +332,9 @@ export const dictionaries: Record<Locale, Dictionary> = {
       seeForecast: "Δείτε την πρόγνωση 7 ημερών",
       sunMoonStrip: "Ήλιος & Σελήνη",
       topFactors: "Τι καθορίζει τη βαθμολογία",
+      topFactorsCaption: "Κάθε παράγοντας παρακάτω υπολογίζεται για κάθε τρόπο ψαρέματος — αλλάζει μόνο η βαρύτητά του.",
+      showAllFactors: "Εμφάνιση και των {count} παραγόντων",
+      showFewerFactors: "Λιγότερα",
     },
     forecast: {
       hourly: "Ανά ώρα",

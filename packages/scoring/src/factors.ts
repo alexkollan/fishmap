@@ -16,6 +16,15 @@ const HOUR_MS = 3_600_000;
 const KMH_PER_KNOT = 1.852;
 
 // --- 4.1 Barometric pressure ----------------------------------------------
+// Controlled studies (Peterson 1972 on rainbow trout; Guy et al. 1992 on
+// black crappie via ultrasonic tag) found pressure predicted activity better
+// than temperature, turbidity, wind, cloud cover, or precipitation — even
+// though fish likely can't sense a few hPa directly (trivial next to the
+// pressure swings of a normal depth change). The leading theory is that
+// pressure is a proxy for the approaching front's other effects rather than
+// a direct trigger. Empirically predictive either way — worth the highest
+// weight for shore/boat, near-zero for spearfishing (appetite-driven, not
+// visibility-driven).
 
 function pressureCurveScore(delta3h: number, delta6h: number, absolute: number): number {
   if (delta3h >= 2) return 20; // sharp post-frontal rise — the worst omen
@@ -302,6 +311,12 @@ export function precipitationFactor(wx: WeatherHour): RawFactor {
 }
 
 // --- 4.9 Moon phase and solunar periods --------------------------------------
+// Genuinely contested: a 2023 North American Journal of Fisheries Management
+// study found popular solunar tables failed to predict fish activity. The
+// well-supported half of "solunar" is dawn/dusk timing itself (§4.6 already
+// covers that) — the lunar component specifically stays unproven. Kept at
+// moderate-to-low weight everywhere on purpose; the twilight-alignment bonus
+// below does most of the real work, not the raw phase score.
 
 export function describeMoonPhase(phase: number): string {
   if (phase < 0.03 || phase > 0.97) return "new";
@@ -340,12 +355,14 @@ export function solunarFactor(wx: WeatherHour, sunMoon: SunMoonData): RawFactor 
 }
 
 // --- 4.10 Current -------------------------------------------------------------
+// Deliberately mode-dependent, unlike most factors here: for shore/boat,
+// moving water beats slack (concentrates bait, §4.10). For spearfishing it's
+// the opposite — diver forums consistently name slack tide as when
+// visibility peaks and diving is easiest; current stirs sediment and fights
+// the diver rather than helping them find fish.
 
-export function currentFactor(wx: WeatherHour): RawFactor {
-  const kmh = wx.oceanCurrentVelocity;
-  if (kmh === undefined) return { key: "current", score: 50, note: "No current data available." };
-  const knots = kmh / KMH_PER_KNOT;
-  const score = interpolateCurve(knots, [
+function shoreOrBoatCurrentScore(knots: number): number {
+  return interpolateCurve(knots, [
     [0, 45],
     [0.05, 45],
     [0.2, 90],
@@ -353,7 +370,27 @@ export function currentFactor(wx: WeatherHour): RawFactor {
     [2, 50],
     [3, 35],
   ]);
-  return { key: "current", score: Math.round(score), note: `${knots.toFixed(2)} kn current.` };
+}
+
+function spearCurrentScore(knots: number): number {
+  return interpolateCurve(knots, [
+    [0, 90],
+    [0.15, 80],
+    [0.4, 45],
+    [1, 20],
+  ]);
+}
+
+export function currentFactor(wx: WeatherHour, mode: Mode): RawFactor {
+  const kmh = wx.oceanCurrentVelocity;
+  if (kmh === undefined) return { key: "current", score: 50, note: "No current data available." };
+  const knots = kmh / KMH_PER_KNOT;
+  const score = mode === "spearfishing" ? spearCurrentScore(knots) : shoreOrBoatCurrentScore(knots);
+  const note =
+    mode === "spearfishing"
+      ? `${knots.toFixed(2)} kn current — slack water gives the best visibility and easiest diving.`
+      : `${knots.toFixed(2)} kn current.`;
+  return { key: "current", score: Math.round(score), note };
 }
 
 // --- 4.11 Seasonality (v1: coarse month + SST, no species) -------------------

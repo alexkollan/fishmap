@@ -92,8 +92,9 @@ function TodayContent({
       )}
 
       <div>
-        <p className="mb-2 text-sm font-medium text-ink">{t.today.topFactors}</p>
-        <FactorBreakdown factors={result.factors} limit={3} />
+        <p className="text-sm font-medium text-ink">{t.today.topFactors}</p>
+        <p className="mb-2 text-xs text-ink-muted">{t.today.topFactorsCaption}</p>
+        <FactorBreakdown factors={result.factors} limit={3} expandable />
       </div>
 
       <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-ground-raised p-4">
