@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ActiveLocation, DailyScore, Mode, ScoreResult, SunMoonData, WeatherHour, WeatherSeries } from "@fishmap/types";
 import { getSunMoonData, scoreHour } from "@fishmap/scoring";
+import { useWeightProfiles } from "@/lib/weightProfiles";
 import { fetchWeather } from "./client";
 
 export interface HourlyConditions {
@@ -73,6 +74,7 @@ function computeDaily(hours: HourlyConditions[]): DailyScore[] {
  * that's only needed for the map's whole-coastline pass (DEV_PLAN.md §5.6).
  */
 export function useConditions(location: ActiveLocation, mode: Mode) {
+  const weightProfiles = useWeightProfiles();
   const query = useQuery({
     queryKey: ["weather", location.lat, location.lon],
     queryFn: ({ signal }) => fetchWeather(location.lat, location.lon, signal),
@@ -93,7 +95,7 @@ export function useConditions(location: ActiveLocation, mode: Mode) {
 
     const hours: HourlyConditions[] = series.hourly.map((hour, index) => {
       const sunMoon = sunMoonByDate.get(dateKey(hour.time))!;
-      return { hour, result: scoreHour(series.hourly, index, sunMoon, mode) };
+      return { hour, result: scoreHour(series.hourly, index, sunMoon, mode, weightProfiles[mode]) };
     });
 
     const nowIndex = findNowIndex(hours);
@@ -107,7 +109,7 @@ export function useConditions(location: ActiveLocation, mode: Mode) {
       daily: computeDaily(hours),
       sunMoonToday,
     };
-  }, [query.data, mode]);
+  }, [query.data, mode, weightProfiles]);
 
   return { ...query, bundle };
 }
