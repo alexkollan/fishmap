@@ -19,10 +19,17 @@ export function scoreColor(score: number): string {
 
 export type ScoreBandKey = "poor" | "fair" | "good" | "veryGood" | "excellent";
 
+// Recalibrated 2026-08-22 alongside the scoring-engine rebalance (see
+// PROGRESS.md): after that fix, real conditions still commonly land in the
+// 45-62 range, which the old <=69 "good" cutoff swallowed whole — a
+// thoroughly unremarkable day was reading as "Good." "good" now requires
+// clearing a real above-average bar; the band below it is relabelled
+// "Meh" (dictionary.ts) rather than the softer "Fair," since that's the
+// whole point — the app should be willing to say a day is nothing special.
 export function scoreBandKey(score: number): ScoreBandKey {
-  if (score <= 29) return "poor";
-  if (score <= 49) return "fair";
-  if (score <= 69) return "good";
-  if (score <= 84) return "veryGood";
+  if (score <= 44) return "poor";
+  if (score <= 62) return "fair";
+  if (score <= 76) return "good";
+  if (score <= 88) return "veryGood";
   return "excellent";
 }

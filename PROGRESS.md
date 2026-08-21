@@ -46,7 +46,25 @@ Effect, live Athens conditions at the time of the change (stable pressure, clear
 
 And on the synthetic scenarios from the curve-recalibration table above: the genuinely great shore day actually moved *up* (79→81, since pressure/light being weighted higher rewards real alignment on those too, not just punishes their absence), the bad/mediocre shore days stayed roughly flat (38, 57) — confirming the rebalance sharpens discrimination rather than just dragging everything down uniformly.
 
-Spearfishing's midnight case (60) is better but still lands in "Good," not "Fair" — `turbidity`+`waves`+`wind` together are still ~49% of spearfishing's weight even after trimming, partly by design (DEV_PLAN.md explicitly calls turbidity spearfishing's single highest-priority factor, citing diver forums ranking visibility above even wave height/safety — this rebalance trimmed that citation-backed weighting rather than discarding it). If a real outing confirms night spearfishing should score lower than this even with flat clear water, the next lever is pushing spearfishing's `light` weight further, or adding a low-light penalty specific to spearfishing rather than relying on weight alone — flagged here rather than pre-emptively guessed at, since it depends on how the app's real users actually spearfish at night (some genuinely do with torches).
+Spearfishing's midnight case (60) is better but still landed in "Good," not "Fair" as of the previous fix — `turbidity`+`waves`+`wind` together are still ~49% of spearfishing's weight even after trimming, partly by design (DEV_PLAN.md explicitly calls turbidity spearfishing's single highest-priority factor, citing diver forums ranking visibility above even wave height/safety — this rebalance trimmed that citation-backed weighting rather than discarding it). See the band-relabelling entry directly below — it resolves this specific case too, without further weight surgery.
+
+### Follow-up: score-band thresholds and wording (same day)
+
+Even after the weight rebalance above, live-checking current conditions still showed the same shape of problem one layer up: a thoroughly unremarkable shore day (score 50-51) was labelled "Good," and the resolved spearfishing midnight case (60) was *also* still "Good." The scoring itself had gotten meaningfully more honest — the presentation layer (`apps/web/src/lib/score.ts`'s `scoreBandKey` cutoffs, `<=69` for "good") hadn't caught up, so a score in the newly-legitimate "unremarkable" 45-62 range was still reading as a positive verdict.
+
+Widened the bands so "good" requires clearing a real bar, and relabelled the band below it from the softer "Fair" to the blunter "Meh" (English only — the Greek "Μέτρια" already reads as bluntly as "mediocre," it was the English wording and the threshold both that were too soft):
+
+```
+poor  (Bad):        <= 44   (was <= 29)
+fair  (Meh):         <= 62   (was <= 49, label was "Fair")
+good  (Good):        <= 76   (was <= 69)
+veryGood (Very good): <= 88  (was <= 84)
+excellent:           > 88    (was > 84)
+```
+
+Live-checked against real Athens conditions at the time: shore 51, boat 58, and the spearfishing midnight case (60) all now read "Meh" instead of "Good" — the exact case the weight rebalance above couldn't fully resolve on its own, resolved instead by being honest about where the boundary sits. A genuinely great shore day (81, real falling pressure + onshore breeze + dusk) reads "Very good"; a genuinely bad one (38, post-frontal rise + dead calm + winter) reads "Bad." Verified live in the browser in both languages (screenshot-checked, not just typechecked).
+
+`scoreColor()` (the green→amber→red gradient) is unchanged — only the discrete band labels and their thresholds moved. This is presentation-layer only; `packages/scoring` and its weights/curves are untouched by this specific follow-up.
 
 ## Current state (as of 2026-08-21)
 

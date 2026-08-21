@@ -347,8 +347,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
     },
     score: {
       bands: {
-        poor: "Poor",
-        fair: "Fair",
+        poor: "Bad",
+        fair: "Meh",
         good: "Good",
         veryGood: "Very good",
         excellent: "Excellent",
