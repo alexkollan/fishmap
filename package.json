@@ -1,0 +1,20 @@
+{
+  "name": "fishmap",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Ψαρέματα — Greek coastal fishing conditions PWA",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@11.11.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @fishmap/web dev",
+    "dev:api": "pnpm --filter @fishmap/api dev",
+    "build": "pnpm --filter @fishmap/web build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
+}

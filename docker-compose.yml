@@ -1,0 +1,37 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      WEB_ORIGIN: http://localhost:48181
+    volumes:
+      - api-data:/repo/apps/api/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_GA_MEASUREMENT_ID: ${VITE_GA_MEASUREMENT_ID:-}
+    ports:
+      - "48181:80"
+    # Not gated on api's healthcheck: web is a static bundle that doesn't
+    # need the API to boot, and Docker Desktop's WSL2 bridge network can
+    # take well over a minute to become reachable on a freshly created
+    # network — a host networking quirk, not an app readiness signal.
+    # The Linux deployment target doesn't hit this.
+    depends_on:
+      - api
+
+volumes:
+  api-data:
