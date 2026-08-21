@@ -14,11 +14,13 @@
     "@fishmap/types": "workspace:*",
     "fastify": "^5.1.0",
     "@fastify/cors": "^10.0.1",
+    "better-sqlite3": "^11.3.0",
     "tsx": "^4.19.2"
   },
   "devDependencies": {
     "typescript": "^5.6.0",
     "vitest": "^2.1.0",
-    "@types/node": "^22.10.0"
+    "@types/node": "^22.10.0",
+    "@types/better-sqlite3": "^7.6.11"
   }
 }

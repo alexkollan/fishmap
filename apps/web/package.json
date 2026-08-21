@@ -18,7 +18,8 @@
     "react-router-dom": "^6.28.0",
     "zustand": "^5.0.1",
     "@tanstack/react-query": "^5.62.0",
-    "idb-keyval": "^6.2.1"
+    "idb-keyval": "^6.2.1",
+    "uplot": "^1.6.31"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

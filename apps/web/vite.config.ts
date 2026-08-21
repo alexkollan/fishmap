@@ -63,6 +63,15 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    proxy: {
+      // Same-origin /api in both dev and prod (nginx proxies it in prod —
+      // see apps/web/nginx.conf) keeps the client fetch code environment-
+      // agnostic and sidesteps CORS entirely.
+      "/api": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     target: "es2022",

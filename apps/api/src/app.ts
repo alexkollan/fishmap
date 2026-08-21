@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { healthRoutes } from "./routes/health.js";
+import { weatherRoutes } from "./routes/weather.js";
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -10,6 +11,7 @@ export function buildApp() {
   });
 
   app.register(healthRoutes);
+  app.register(weatherRoutes);
 
   return app;
 }

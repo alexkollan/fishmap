@@ -10,10 +10,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@fishmap/types": "workspace:*"
+    "@fishmap/types": "workspace:*",
+    "suncalc": "^1.9.0"
   },
   "devDependencies": {
     "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "@types/suncalc": "^1.9.2"
   }
 }
