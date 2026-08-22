@@ -42,7 +42,7 @@ export function NavBar() {
       </nav>
 
       <nav className="fixed inset-y-0 left-0 z-10 hidden w-56 flex-col gap-1 border-r border-white/10 bg-ground px-3 py-4 md:flex">
-        <span className="mb-2 px-3 text-sm font-semibold text-ink">Ψαρέματα</span>
+        <span className="mb-2 px-3 text-sm font-semibold text-ink">Fishmap</span>
         {desktopLinks.map((link) => (
           <NavLink key={link.to} to={link.to} end={link.to === "/"} className={navLinkClass}>
             {link.label}

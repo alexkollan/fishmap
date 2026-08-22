@@ -11,7 +11,7 @@ export function Header() {
   return (
     <header className="relative border-b border-white/10 bg-ground px-4 py-3">
       <div className="mx-auto flex max-w-3xl items-center justify-between">
-        <span className="font-semibold text-ink">Ψαρέματα</span>
+        <span className="font-semibold text-ink">Fishmap</span>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}

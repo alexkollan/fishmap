@@ -20,8 +20,8 @@ export default defineConfig({
       },
       includeAssets: ["icons/apple-touch-icon.png"],
       manifest: {
-        name: "Ψαρέματα — Fishing conditions",
-        short_name: "Ψαρέματα",
+        name: "Fishmap — Fishing conditions",
+        short_name: "Fishmap",
         description: "Is it worth going fishing here, right now?",
         lang: "el",
         start_url: "/",

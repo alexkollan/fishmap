@@ -40,7 +40,7 @@ export function AdminPage() {
     <div className="min-h-full bg-ground">
       <div className="mx-auto max-w-2xl px-4 py-6">
         <div className="mb-4 flex items-center justify-between">
-          <span className="font-semibold text-ink">Ψαρέματα — {t.nav.admin}</span>
+          <span className="font-semibold text-ink">Fishmap — {t.nav.admin}</span>
           <button
             type="button"
             onClick={async () => {
