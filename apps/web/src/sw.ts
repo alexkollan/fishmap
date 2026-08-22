@@ -9,6 +9,23 @@ declare const self: ServiceWorkerGlobalScope & {
 // precache list. Everything else (map data, tiles) stays runtime-fetched.
 precacheAndRoute(self.__WB_MANIFEST);
 
+// registerType: "autoUpdate" (vite.config.ts) means every deploy should
+// take over immediately, with no "close all tabs to update" limbo — but
+// that behavior isn't automatic just from setting the option. generateSW
+// injects this pairing for you; injectManifest (used here, for the custom
+// push/notificationclick handlers below) does not, so it has to be done
+// by hand. Without it, a new service worker installs but stays "waiting"
+// indefinitely — the previous version keeps controlling every open tab,
+// serving whatever JS bundle it precached at install time, until the user
+// closes every tab of the site. A returning user can be running a build
+// from days/deploys ago with zero indication anything's stale.
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+self.addEventListener("activate", (event: ExtendableEvent) => {
+  event.waitUntil(self.clients.claim());
+});
+
 interface PushPayload {
   title: string;
   body: string;
