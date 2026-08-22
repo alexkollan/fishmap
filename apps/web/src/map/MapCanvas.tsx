@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Map as MaplibreMap, Marker, NavigationControl, type MapMouseEvent } from "maplibre-gl";
+import { Map as MaplibreMap, Marker, NavigationControl, setWorkerUrl, type MapMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { ActiveLocation } from "@fishmap/types";
 import { COASTLINE_LINE_LAYER_ID } from "./useCoastlineScoring";
+
+// MapLibre auto-locates its worker by constructing a URL relative to
+// wherever its own JS happened to load from — that guess is only ever
+// right by accident of dev-server layout, so we point it explicitly at a
+// vendored copy instead (public/vendor/, see the README there for why
+// it's a manual copy rather than a normal import).
+setWorkerUrl("/vendor/maplibre-gl-worker.mjs");
 
 // CARTO Dark Matter, free tier, vector, GPU-rendered (DEV_PLAN.md §3.7).
 const STYLE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
