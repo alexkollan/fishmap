@@ -34,12 +34,7 @@ export interface CoastlineScoringState {
  * setFeatureState. Panning = fetch only what's new; scrubbing the hour =
  * zero network calls, one worker pass.
  */
-export function useCoastlineScoring(
-  map: MaplibreMap | null,
-  mode: Mode,
-  hourIndex: number,
-  scoreLayer: string = "overall",
-): CoastlineScoringState {
+export function useCoastlineScoring(map: MaplibreMap | null, mode: Mode, hourIndex: number): CoastlineScoringState {
   const [coastline, setCoastline] = useState<CoastlineCollection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fetchingGrid, setFetchingGrid] = useState(false);
@@ -55,17 +50,17 @@ export function useCoastlineScoring(
   const modeRef = useRef(mode);
   const hourIndexRef = useRef(hourIndex);
   const segmentCountRef = useRef(0);
-  const lastScoresRef = useRef<Extract<FromWorkerMessage, { type: "scores" }> | null>(null);
-  const scoreLayerRef = useRef(scoreLayer);
 
   modeRef.current = mode;
   hourIndexRef.current = hourIndex;
-  scoreLayerRef.current = scoreLayer;
 
+  // The coastline always shows Overall — per-factor "weather map" layers
+  // render separately as a full-viewport heatmap (useAreaScoreGrid.ts).
+  // Per-factor scores still ride along on every "scores" message because
+  // the tap-to-inspect SpotSheet breakdown needs them.
   function paint(map: MaplibreMap, msg: Extract<FromWorkerMessage, { type: "scores" }>) {
-    const values = scoreLayerRef.current === "overall" ? msg.overall : (msg.factors[scoreLayerRef.current] ?? msg.overall);
     for (let i = 0; i < msg.ids.length; i++) {
-      map.setFeatureState({ source: COASTLINE_SOURCE_ID, id: msg.ids[i]! }, { score: values[i]! });
+      map.setFeatureState({ source: COASTLINE_SOURCE_ID, id: msg.ids[i]! }, { score: msg.overall[i]! });
     }
   }
 
@@ -243,7 +238,6 @@ export function useCoastlineScoring(
 
     const onMessage = (event: MessageEvent<FromWorkerMessage>) => {
       if (event.data.type === "scores") {
-        lastScoresRef.current = event.data;
         if (map) paint(map, event.data);
         return;
       }
@@ -256,13 +250,6 @@ export function useCoastlineScoring(
     return () => worker.removeEventListener("message", onMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
-
-  // Switching the visible score layer never needs a new worker round trip —
-  // every factor's score already rode along on the last "scores" message.
-  useEffect(() => {
-    if (map && lastScoresRef.current) paint(map, lastScoresRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scoreLayer, map]);
 
   return {
     loading: coastline === null && error === null,

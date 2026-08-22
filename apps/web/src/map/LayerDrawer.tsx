@@ -12,9 +12,10 @@ interface LayerDrawerProps {
 const SCORE_LAYERS: ScoreLayerKey[] = ["overall", "wind", "waves", "pressure", "seaTemp", "turbidity", "current", "light"];
 const OVERLAY_KEYS: (keyof OverlayState)[] = ["bathymetry", "posidonia", "seamarks"];
 
-// Per-parameter layer control (DEV_PLAN.md §6.4): score layers recolour the
-// coastline by a single factor, overlays draw independent raster layers on
-// top. State persists to localStorage via useMapLayers.
+// Per-parameter layer control (DEV_PLAN.md §6.4): score layers paint a
+// full-viewport factor heatmap (useAreaScoreGrid.ts) — the coastline itself
+// always stays on Overall. Overlays draw independent raster layers on top
+// of everything. State persists to localStorage via useMapLayers.
 export function LayerDrawer({ scoreLayer, onScoreLayerChange, overlays, onToggleOverlay, onClose }: LayerDrawerProps) {
   const { t } = useI18n();
 
@@ -43,6 +44,16 @@ export function LayerDrawer({ scoreLayer, onScoreLayerChange, overlays, onToggle
           </button>
         ))}
       </div>
+
+      {scoreLayer !== "overall" && (
+        <div className="mb-3 px-2">
+          <div className="h-2 w-full rounded-full" style={{ background: "linear-gradient(to right, #f87171, #facc15, #4ade80)" }} />
+          <div className="mt-1 flex justify-between text-[10px] text-ink-muted">
+            <span>0</span>
+            <span>100</span>
+          </div>
+        </div>
+      )}
 
       <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">{t.map.overlays}</p>
       <div className="flex flex-col gap-1">

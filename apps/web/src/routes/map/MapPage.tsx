@@ -10,6 +10,7 @@ import { TimeScrubber } from "@/map/TimeScrubber";
 import { SpotSheet } from "@/map/SpotSheet";
 import { LayerDrawer } from "@/map/LayerDrawer";
 import { useCoastlineScoring } from "@/map/useCoastlineScoring";
+import { useAreaScoreGrid } from "@/map/useAreaScoreGrid";
 import { useMapLayers, type ScoreLayerKey } from "@/map/useMapLayers";
 
 function findNowIndex(times: string[]): number {
@@ -36,7 +37,7 @@ export function MapPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [scoreLayer, setScoreLayer] = useState<ScoreLayerKey>("overall");
 
-  const scoring = useCoastlineScoring(map, mode, hourIndex ?? 0, scoreLayer);
+  const scoring = useCoastlineScoring(map, mode, hourIndex ?? 0);
   const nowIndex = useMemo(() => findNowIndex(scoring.hourlyTimes), [scoring.hourlyTimes]);
 
   // Snap to "now" the first moment we know where that is; after that the
@@ -45,6 +46,7 @@ export function MapPage() {
     if (hourIndex === null && scoring.hourlyTimes.length > 0) setHourIndex(nowIndex);
   }, [hourIndex, nowIndex, scoring.hourlyTimes.length]);
 
+  useAreaScoreGrid(map, mode, hourIndex ?? 0, scoreLayer);
   const layers = useMapLayers(map);
 
   const handleReady = useCallback((m: MaplibreMap) => setMap(m), []);
