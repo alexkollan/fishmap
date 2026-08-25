@@ -12,7 +12,14 @@
 // English-only).
 import type { Mode, SunMoonData, SunTimes, WeatherHour } from "@fishmap/types";
 import { clamp, interpolateCurve } from "./curve.js";
-import { isWithinDawnWindow, isWithinDuskWindow } from "./time.js";
+import {
+  DAWN_AFTER_MIN,
+  DAWN_BEFORE_MIN,
+  DUSK_AFTER_MIN,
+  DUSK_BEFORE_MIN,
+  isWithinDawnWindow,
+  isWithinDuskWindow,
+} from "./time.js";
 
 export interface RawFactor {
   key: string;
@@ -27,6 +34,7 @@ function factor(key: string, score: number, note: string, noteKey: string, noteP
 }
 
 const HOUR_MS = 3_600_000;
+const MINUTE_MS = 60_000;
 const KMH_PER_KNOT = 1.852;
 
 // --- 4.1 Barometric pressure ----------------------------------------------
@@ -382,8 +390,34 @@ function timeOfDayBase(
 
   const sunrise = Date.parse(sun.sunrise);
   const sunset = Date.parse(sun.sunset);
-  if (!Number.isNaN(sunrise) && isWithinDawnWindow(tMs, sunrise)) return { score: 100, noteKey: "light.dawn", isLowLightAlready: true };
-  if (!Number.isNaN(sunset) && isWithinDuskWindow(tMs, sunset)) return { score: 100, noteKey: "light.dusk", isLowLightAlready: true };
+  // Recalibrated 2026-08-25: dawn/dusk used to be a flat 100 across the
+  // whole window, which — combined with light's high weight — made the app
+  // mechanically pick the same ~2.5h block as "best" nearly every day
+  // regardless of actual weather (confirmed directly: a real user noticed
+  // the pattern before this was caught). Now it peaks at 100 only at the
+  // sunrise/sunset instant itself and tapers toward the window edges, so
+  // the dawn/dusk signal stays real without steamrolling everything else.
+  // Edge values (55) were chosen to roughly continue into whatever the
+  // night/daytime curves below already produce just outside the window,
+  // rather than introducing a new cliff.
+  if (!Number.isNaN(sunrise) && isWithinDawnWindow(tMs, sunrise)) {
+    const minutesFromSunrise = (tMs - sunrise) / MINUTE_MS;
+    const score = interpolateCurve(minutesFromSunrise, [
+      [-DAWN_BEFORE_MIN, 55],
+      [0, 100],
+      [DAWN_AFTER_MIN, 55],
+    ]);
+    return { score, noteKey: "light.dawn", isLowLightAlready: true };
+  }
+  if (!Number.isNaN(sunset) && isWithinDuskWindow(tMs, sunset)) {
+    const minutesFromSunset = (tMs - sunset) / MINUTE_MS;
+    const score = interpolateCurve(minutesFromSunset, [
+      [-DUSK_BEFORE_MIN, 55],
+      [0, 100],
+      [DUSK_AFTER_MIN, 55],
+    ]);
+    return { score, noteKey: "light.dusk", isLowLightAlready: true };
+  }
   // Recalibrated 2026-08-22: both baselines lowered so "not dawn/dusk"
   // reads as genuinely unremarkable rather than a near-default positive.
   if (isDay === 0) return { score: 52, noteKey: "light.night", isLowLightAlready: true };
