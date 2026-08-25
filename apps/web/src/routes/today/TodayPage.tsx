@@ -5,7 +5,7 @@ import { useModeStore } from "@/lib/mode/store";
 import { useI18n } from "@/lib/i18n";
 import { renderFactorNote, renderVetoNote } from "@/lib/i18n/renderFactorNote";
 import { useConditions, type HourlyConditions } from "@/lib/weather/useConditions";
-import { formatLocalTime } from "@/lib/formatTime";
+import { formatLocalDay, formatLocalTime } from "@/lib/formatTime";
 import { ConditionsGate } from "@/ui/ConditionsGate";
 import { ScoreBadge } from "@/ui/ScoreBadge";
 import { FactorBreakdown } from "@/ui/FactorBreakdown";
@@ -16,14 +16,20 @@ const GOOD_THRESHOLD = 70;
 const LOOKAHEAD_HOURS = 48;
 
 function findNextGoodWindow(hours: HourlyConditions[], nowIndex: number): HourlyConditions | null {
-  const end = Math.min(hours.length, nowIndex + LOOKAHEAD_HOURS);
+  // Starts at nowIndex + 1, not nowIndex: the current hour is already shown
+  // by the ScoreBadge above, and including it here meant "next good window"
+  // could resolve to *this* hour — displayed with a start time that reads as
+  // already-past the moment you're any way into that hour (e.g. "19:00" at
+  // 19:20). "Next" should mean strictly upcoming.
+  const start = nowIndex + 1;
+  const end = Math.min(hours.length, start + LOOKAHEAD_HOURS);
   let best: HourlyConditions | null = null;
-  for (let i = nowIndex; i < end; i++) {
+  for (let i = start; i < end; i++) {
     const h = hours[i]!;
     if (h.result.score >= GOOD_THRESHOLD && (!best || h.result.score > best.result.score)) best = h;
   }
   if (best) return best;
-  for (let i = nowIndex; i < end; i++) {
+  for (let i = start; i < end; i++) {
     const h = hours[i]!;
     if (!best || h.result.score > best.result.score) best = h;
   }
@@ -87,7 +93,9 @@ function TodayContent({
         <div className="rounded-lg border border-white/10 bg-ground-raised p-4">
           <p className="text-sm text-ink-muted">{t.today.nextGoodWindow}</p>
           <div className="mt-1 flex items-baseline gap-3">
-            <span className="font-tabular text-2xl text-ink">{formatLocalTime(nextGood.hour.time, locale)}</span>
+            <span className="font-tabular text-2xl text-ink">
+              {formatLocalDay(nextGood.hour.time, locale)} · {formatLocalTime(nextGood.hour.time, locale)}
+            </span>
             <ScoreBadge score={nextGood.result.score} size="md" />
           </div>
         </div>
