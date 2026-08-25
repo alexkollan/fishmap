@@ -9,7 +9,6 @@ import { FactorBreakdown } from "@/ui/FactorBreakdown";
 
 interface SpotSheetProps {
   location: ActiveLocation;
-  aspectDeg: number | null;
   mode: Mode;
   onClose: () => void;
 }
@@ -25,7 +24,7 @@ const CONDITION_LINKS: { to: string; labelKey: "wind" | "sea" | "pressure" | "sk
 // Bottom sheet on tap (DEV_PLAN.md §6.5) — a summary, not a replacement for
 // the detail pages. Every row links through to the relevant /conditions/*
 // page for this exact location, which is the bridge between map and app.
-export function SpotSheet({ location, aspectDeg, mode, onClose }: SpotSheetProps) {
+export function SpotSheet({ location, mode, onClose }: SpotSheetProps) {
   const { t, locale } = useI18n();
   const { bundle, isLoading, isError } = useConditions(location, mode);
   const search = `?lat=${location.lat}&lon=${location.lon}&name=${encodeURIComponent(location.name)}`;
@@ -37,7 +36,6 @@ export function SpotSheet({ location, aspectDeg, mode, onClose }: SpotSheetProps
           <p className="font-medium text-ink">{location.name || `${location.lat.toFixed(3)}, ${location.lon.toFixed(3)}`}</p>
           <p className="text-xs text-ink-muted">
             {location.lat.toFixed(3)}, {location.lon.toFixed(3)}
-            {aspectDeg !== null && ` · ${t.map.facing.replace("{deg}", String(Math.round(aspectDeg)))}`}
           </p>
         </div>
         <button type="button" onClick={onClose} className="rounded-md px-2 py-1 text-ink-muted hover:bg-white/5 hover:text-ink" aria-label={t.map.closeSheet}>

@@ -3,7 +3,6 @@ import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 import { healthRoutes } from "./routes/health.js";
 import { weatherRoutes } from "./routes/weather.js";
-import { scoreRoutes } from "./routes/scores.js";
 import { tileRoutes } from "./routes/tiles.js";
 import { adminRoutes } from "./routes/admin.js";
 import { spotsRoutes } from "./routes/spots.js";
@@ -21,7 +20,6 @@ export function buildApp() {
 
   app.register(healthRoutes);
   app.register(weatherRoutes);
-  app.register(scoreRoutes);
   app.register(tileRoutes);
   app.register(adminRoutes);
   app.register(spotsRoutes);

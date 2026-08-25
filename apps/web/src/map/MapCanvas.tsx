@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Map as MaplibreMap, Marker, NavigationControl, setWorkerUrl, type MapMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { ActiveLocation } from "@fishmap/types";
-import { COASTLINE_LINE_LAYER_ID } from "./useCoastlineScoring";
 
 // MapLibre auto-locates its worker by constructing a URL relative to
 // wherever its own JS happened to load from — that guess is only ever
@@ -18,10 +17,10 @@ const GREECE_BOUNDS: [number, number, number, number] = [19.2, 34.5, 29.7, 41.8]
 interface MapCanvasProps {
   center: ActiveLocation;
   onReady: (map: MaplibreMap) => void;
-  onSegmentTap: (props: Record<string, unknown> | null, lngLat: { lng: number; lat: number }) => void;
+  onTap: (lngLat: { lng: number; lat: number }) => void;
 }
 
-export function MapCanvas({ center, onReady, onSegmentTap }: MapCanvasProps) {
+export function MapCanvas({ center, onReady, onTap }: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MaplibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
@@ -50,15 +49,7 @@ export function MapCanvas({ center, onReady, onSegmentTap }: MapCanvasProps) {
     });
 
     map.on("click", (e: MapMouseEvent) => {
-      const features = map.queryRenderedFeatures(
-        [
-          [e.point.x - 6, e.point.y - 6],
-          [e.point.x + 6, e.point.y + 6],
-        ],
-        { layers: map.getLayer(COASTLINE_LINE_LAYER_ID) ? [COASTLINE_LINE_LAYER_ID] : [] },
-      );
-      const hit = features[0];
-      onSegmentTap((hit?.properties as Record<string, unknown>) ?? null, e.lngLat);
+      onTap(e.lngLat);
       setPinned(true);
     });
 

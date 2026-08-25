@@ -105,14 +105,8 @@ export interface Dictionary {
     week: string;
   };
   map: {
-    now: string;
-    timeScrubber: string;
-    coastlinePoint: string;
-    facing: string;
     closeSheet: string;
     layers: string;
-    scoreLayers: string;
-    overallLayer: string;
     overlays: string;
     overlayLabels: { bathymetry: string; posidonia: string; seamarks: string };
   };
@@ -458,14 +452,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
       week: "This week",
     },
     map: {
-      now: "Now",
-      timeScrubber: "Time",
-      coastlinePoint: "Coastline point",
-      facing: "faces {deg}°",
       closeSheet: "Close",
       layers: "Layers",
-      scoreLayers: "Score layers",
-      overallLayer: "Overall",
       overlays: "Overlays",
       overlayLabels: {
         bathymetry: "Bathymetry (depth)",
@@ -817,14 +805,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
       week: "Αυτή την εβδομάδα",
     },
     map: {
-      now: "Τώρα",
-      timeScrubber: "Χρόνος",
-      coastlinePoint: "Σημείο ακτής",
-      facing: "βλέπει προς {deg}°",
       closeSheet: "Κλείσιμο",
       layers: "Επίπεδα",
-      scoreLayers: "Επίπεδα βαθμολογίας",
-      overallLayer: "Συνολική",
       overlays: "Επικαλύψεις",
       overlayLabels: {
         bathymetry: "Βαθυμετρία (βάθος)",

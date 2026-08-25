@@ -1,22 +1,19 @@
 import { useI18n } from "@/lib/i18n";
-import type { OverlayState, ScoreLayerKey } from "./useMapLayers";
+import type { OverlayState } from "./useMapLayers";
 
 interface LayerDrawerProps {
-  scoreLayer: ScoreLayerKey;
-  onScoreLayerChange: (key: ScoreLayerKey) => void;
   overlays: OverlayState;
   onToggleOverlay: (key: keyof OverlayState) => void;
   onClose: () => void;
 }
 
-const SCORE_LAYERS: ScoreLayerKey[] = ["overall", "wind", "waves", "pressure", "seaTemp", "turbidity", "current", "light"];
 const OVERLAY_KEYS: (keyof OverlayState)[] = ["bathymetry", "posidonia", "seamarks"];
 
-// Per-parameter layer control (DEV_PLAN.md §6.4): score layers paint a
-// full-viewport factor heatmap (useAreaScoreGrid.ts) — the coastline itself
-// always stays on Overall. Overlays draw independent raster layers on top
-// of everything. State persists to localStorage via useMapLayers.
-export function LayerDrawer({ scoreLayer, onScoreLayerChange, overlays, onToggleOverlay, onClose }: LayerDrawerProps) {
+// Map overlay control (DEV_PLAN.md §6.4): independent raster layers drawn on
+// top of the base map. The score/factor overlay this drawer used to also
+// control was removed 2026-08-25 — see PROGRESS.md — the map now only does
+// tap-to-inspect via SpotSheet. State persists to localStorage via useMapLayers.
+export function LayerDrawer({ overlays, onToggleOverlay, onClose }: LayerDrawerProps) {
   const { t } = useI18n();
 
   return (
@@ -27,33 +24,6 @@ export function LayerDrawer({ scoreLayer, onScoreLayerChange, overlays, onToggle
           ✕
         </button>
       </div>
-
-      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">{t.map.scoreLayers}</p>
-      <div className="mb-3 flex flex-col gap-0.5">
-        {SCORE_LAYERS.map((key) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onScoreLayerChange(key)}
-            className={`rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
-              key === scoreLayer ? "bg-white/10 text-ink" : "text-ink-muted hover:text-ink"
-            }`}
-            aria-pressed={key === scoreLayer}
-          >
-            {key === "overall" ? t.map.overallLayer : t.factors[key]}
-          </button>
-        ))}
-      </div>
-
-      {scoreLayer !== "overall" && (
-        <div className="mb-3 px-2">
-          <div className="h-2 w-full rounded-full" style={{ background: "linear-gradient(to right, #f87171, #facc15, #4ade80)" }} />
-          <div className="mt-1 flex justify-between text-[10px] text-ink-muted">
-            <span>0</span>
-            <span>100</span>
-          </div>
-        </div>
-      )}
 
       <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">{t.map.overlays}</p>
       <div className="flex flex-col gap-1">

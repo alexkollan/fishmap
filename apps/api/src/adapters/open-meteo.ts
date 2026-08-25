@@ -1,7 +1,8 @@
 // Open-Meteo adapter — no API key, CORS-enabled, free for non-commercial use
-// (DEV_PLAN.md §3.1). Both endpoints accept comma-separated lat/lon lists for
-// batching; Phase 2 only needs single-point calls, batching lands with the
-// map's viewport fetch in Phase 5.
+// (DEV_PLAN.md §3.1). Single-point only: the batched area-grid pipeline
+// (map factor layers) was removed 2026-08-25 — see PROGRESS.md — after
+// turning out to need a genuinely cold sweep costing ~115 minutes even with
+// every optimization tried, against Open-Meteo's free-tier rate limits.
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
 const MARINE_URL = "https://marine-api.open-meteo.com/v1/marine";
 
@@ -47,11 +48,6 @@ export interface OpenMeteoHourlyResponse {
   };
 }
 
-// No timeout here previously meant a single stalled connection (DNS/TCP
-// hang with no error, no response) could leave an `await` pending forever —
-// fatal for the area-refresh cron (jobs/areaWeatherRefresh.ts), which loops
-// ~80 sequential batches: one hung request silently stops all progress with
-// no error ever logged. 20s is generous for a single-point request.
 const REQUEST_TIMEOUT_MS = 20_000;
 
 async function fetchOpenMeteo(
@@ -91,64 +87,4 @@ export function fetchMarine(lat: number, lon: number, days = 7) {
     past_days: String(PAST_DAYS),
     timezone: "auto",
   });
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-const MAX_RATE_LIMIT_RETRIES = 4;
-
-async function fetchOpenMeteoBatch(
-  url: string,
-  points: { lat: number; lon: number }[],
-  hourly: string,
-  days: number,
-): Promise<OpenMeteoHourlyResponse[]> {
-  const qs = new URLSearchParams({
-    latitude: points.map((p) => String(p.lat)).join(","),
-    longitude: points.map((p) => String(p.lon)).join(","),
-    hourly,
-    forecast_days: String(days),
-    past_days: String(PAST_DAYS),
-    timezone: "auto",
-  });
-  const requestUrl = `${url}?${qs.toString()}`;
-
-  // Open-Meteo's free tier enforces a per-minute request cap (observed
-  // directly: firing the area-refresh cron's ~158 batch requests back to
-  // back with no pacing hit "Minutely API request limit exceeded" / 503
-  // "service overloaded" after only a handful). Retrying with backoff here
-  // (rather than in the cron job) means every caller of the batch fetchers
-  // — this route and the live /api/weather/grid — gets the same resilience.
-  for (let attempt = 0; ; attempt++) {
-    // Longer than the single-point timeout — up to 100 points in one
-    // request legitimately takes longer to compute upstream.
-    const res = await fetch(requestUrl, { signal: AbortSignal.timeout(45_000) });
-    if (res.ok) {
-      const json = (await res.json()) as OpenMeteoHourlyResponse | OpenMeteoHourlyResponse[];
-      // Open-Meteo returns a bare object for a single coordinate pair and an
-      // array once there's more than one — normalise to always-an-array so
-      // callers don't special-case the single-point map viewport.
-      return Array.isArray(json) ? json : [json];
-    }
-
-    const retryable = res.status === 429 || res.status === 503;
-    if (!retryable || attempt >= MAX_RATE_LIMIT_RETRIES) {
-      throw new Error(`Open-Meteo batch request failed (${res.status}): ${await res.text()}`);
-    }
-    const retryAfterHeader = Number(res.headers.get("retry-after"));
-    const waitMs = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0 ? retryAfterHeader * 1000 : 65_000;
-    await sleep(waitMs);
-  }
-}
-
-/** Map's viewport fetch (DEV_PLAN.md §5.2): one request for every grid point
- * the visible coastline needs, instead of one request per segment. */
-export function fetchForecastBatch(points: { lat: number; lon: number }[], days = 7) {
-  return fetchOpenMeteoBatch(FORECAST_URL, points, FORECAST_HOURLY, days);
-}
-
-export function fetchMarineBatch(points: { lat: number; lon: number }[], days = 7) {
-  return fetchOpenMeteoBatch(MARINE_URL, points, MARINE_HOURLY, days);
 }

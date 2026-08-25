@@ -3,8 +3,6 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Map as MaplibreMap } from "maplibre-gl";
 
-export type ScoreLayerKey = "overall" | "wind" | "waves" | "pressure" | "seaTemp" | "turbidity" | "current" | "light";
-
 export interface OverlayState {
   bathymetry: boolean;
   posidonia: boolean;
@@ -51,8 +49,7 @@ const OVERLAY_DEFS: Record<keyof OverlayState, { sourceId: string; layerId: stri
   },
 };
 
-/** Adds/removes raster overlay sources+layers on the map as their toggles
- * flip, above the coastline line layer so overlays never hide the score. */
+/** Adds/removes raster overlay sources+layers on the map as their toggles flip. */
 export function useMapLayers(map: MaplibreMap | null) {
   const overlays = useOverlayStore((s) => s.overlays);
   const toggleOverlay = useOverlayStore((s) => s.toggleOverlay);
