@@ -49,6 +49,11 @@ const OVERLAY_DEFS: Record<keyof OverlayState, { sourceId: string; layerId: stri
   },
 };
 
+// Exposed so useWindyLayer.ts can slot its pressure gradient image layer
+// below whichever of these happens to be active (best-effort — this whole
+// overlay system has no z-order concept beyond insertion order otherwise).
+export const OVERLAY_LAYER_IDS = Object.values(OVERLAY_DEFS).map((def) => def.layerId);
+
 /** Adds/removes raster overlay sources+layers on the map as their toggles flip. */
 export function useMapLayers(map: MaplibreMap | null) {
   const overlays = useOverlayStore((s) => s.overlays);

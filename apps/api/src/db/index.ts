@@ -88,7 +88,7 @@ const seedFlag = db.prepare(
 );
 seedFlag.run({
   key: "windParticles",
-  description: "Animated wind particle overlay on the map — unproven frame cost, admin-only until measured (DEV_PLAN.md §6.6).",
+  description: "Animated wind particle overlay on the map — unproven frame cost, admin-only until measured (DEV_PLAN.md §6.4).",
   state: "admin_only",
   now: Date.now(),
 });

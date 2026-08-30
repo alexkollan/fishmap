@@ -8,6 +8,7 @@ import { adminRoutes } from "./routes/admin.js";
 import { spotsRoutes } from "./routes/spots.js";
 import { pushRoutes } from "./routes/push.js";
 import { miscRoutes } from "./routes/misc.js";
+import { fieldRoutes } from "./routes/fields.js";
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -25,6 +26,7 @@ export function buildApp() {
   app.register(spotsRoutes);
   app.register(pushRoutes);
   app.register(miscRoutes);
+  app.register(fieldRoutes);
 
   return app;
 }

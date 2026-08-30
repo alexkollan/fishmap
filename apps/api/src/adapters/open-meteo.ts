@@ -1,8 +1,15 @@
 // Open-Meteo adapter — no API key, CORS-enabled, free for non-commercial use
-// (DEV_PLAN.md §3.1). Single-point only: the batched area-grid pipeline
-// (map factor layers) was removed 2026-08-25 — see PROGRESS.md — after
-// turning out to need a genuinely cold sweep costing ~115 minutes even with
-// every optimization tried, against Open-Meteo's free-tier rate limits.
+// (DEV_PLAN.md §3.1). Single-point fetchForecast/fetchMarine below cover
+// every per-spot page. A batched area-grid pipeline (map factor layers) was
+// removed 2026-08-25 — see PROGRESS.md — after turning out to need a
+// genuinely cold sweep costing ~115 minutes even with every optimization
+// tried, against Open-Meteo's free-tier rate limits (~7,844 cells, 26
+// variables/cell). fetchForecastBatch/fetchMarineBatch below revive the same
+// batching shape for the wind/current/pressure map layer (jobs/
+// vectorFieldRefresh.ts), but scoped to a ~25x smaller grid (0.5° vs 0.1°,
+// see lib/areaGrid.ts) and only 5 variables total instead of 26 — comfortably
+// inside the same limit that broke the old design, verified by the math in
+// vectorFieldRefresh.ts's comments, not just hoped.
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
 const MARINE_URL = "https://marine-api.open-meteo.com/v1/marine";
 
@@ -87,4 +94,64 @@ export function fetchMarine(lat: number, lon: number, days = 7) {
     past_days: String(PAST_DAYS),
     timezone: "auto",
   });
+}
+
+// --- Batched area-grid fetch (wind/current/pressure map layer only) --------
+// Narrow on purpose: only the variables the particle/gradient layer actually
+// renders. No past_days — there's no trend factor here, unlike the
+// single-point fetchers above, so there's nothing to look back for.
+const AREA_FORECAST_HOURLY = ["wind_speed_10m", "wind_direction_10m", "pressure_msl"].join(",");
+const AREA_MARINE_HOURLY = ["ocean_current_velocity", "ocean_current_direction"].join(",");
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const MAX_RATE_LIMIT_RETRIES = 4;
+
+async function fetchOpenMeteoBatch(
+  url: string,
+  points: { lat: number; lon: number }[],
+  hourly: string,
+  days: number,
+): Promise<OpenMeteoHourlyResponse[]> {
+  const qs = new URLSearchParams({
+    latitude: points.map((p) => String(p.lat)).join(","),
+    longitude: points.map((p) => String(p.lon)).join(","),
+    hourly,
+    forecast_days: String(days),
+    timezone: "auto",
+  });
+  const requestUrl = `${url}?${qs.toString()}`;
+
+  // Open-Meteo's free tier enforces a per-minute request cap (observed
+  // directly during the old area-grid's development: firing batch requests
+  // back to back with no pacing hit "Minutely API request limit exceeded" /
+  // 503 "service overloaded" after only a handful). Retrying with backoff
+  // here means every caller of the batch fetchers gets the same resilience.
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(requestUrl, { signal: AbortSignal.timeout(45_000) });
+    if (res.ok) {
+      const json = (await res.json()) as OpenMeteoHourlyResponse | OpenMeteoHourlyResponse[];
+      // Open-Meteo returns a bare object for a single coordinate pair and an
+      // array once there's more than one — normalise to always-an-array.
+      return Array.isArray(json) ? json : [json];
+    }
+
+    const retryable = res.status === 429 || res.status === 503;
+    if (!retryable || attempt >= MAX_RATE_LIMIT_RETRIES) {
+      throw new Error(`Open-Meteo batch request failed (${res.status}): ${await res.text()}`);
+    }
+    const retryAfterHeader = Number(res.headers.get("retry-after"));
+    const waitMs = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0 ? retryAfterHeader * 1000 : 65_000;
+    await sleep(waitMs);
+  }
+}
+
+export function fetchForecastBatch(points: { lat: number; lon: number }[], days = 2) {
+  return fetchOpenMeteoBatch(FORECAST_URL, points, AREA_FORECAST_HOURLY, days);
+}
+
+export function fetchMarineBatch(points: { lat: number; lon: number }[], days = 2) {
+  return fetchOpenMeteoBatch(MARINE_URL, points, AREA_MARINE_HOURLY, days);
 }

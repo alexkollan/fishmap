@@ -544,6 +544,24 @@ export function solunarFactor(wx: WeatherHour, sunMoon: SunMoonData): RawFactor 
 // the opposite — diver forums consistently name slack tide as when
 // visibility peaks and diving is easiest; current stirs sediment and fights
 // the diver rather than helping them find fish.
+//
+// Shore/boat is also direction-relative, same idea as wind (§4.2): current
+// only "concentrates bait against the shore" if it's actually moving toward
+// the shore. Current pulling straight out to sea does the opposite — nothing
+// to pin bait against. Needs a coastline segment's aspectDeg, same as wind;
+// speed-only until one is supplied (currently: never — see the aspectDeg
+// comment at §4.2, the coastline pipeline is orphaned and nothing calls this
+// with a real aspectDeg today, so this branch is dormant, ready for whenever
+// coastline data comes back). Spearfishing stays speed-only regardless — the
+// slack-water argument is about turbidity/visibility, not direction.
+//
+// One critical wrinkle vs. wind: Open-Meteo's `ocean_current_direction` uses
+// the oceanographic "to" convention (the bearing the current is heading
+// *toward*), not meteorological "from" like wind_direction_10m. Onshore
+// current is therefore current heading toward the *landward* bearing
+// (aspectDeg + 180), not toward aspectDeg itself — do not reuse
+// windShoreAngle's "from" math here, it would score onshore/offshore
+// backwards.
 
 function shoreOrBoatCurrentScore(knots: number): number {
   return interpolateCurve(knots, [
@@ -556,6 +574,43 @@ function shoreOrBoatCurrentScore(knots: number): number {
   ]);
 }
 
+// Onshore keeps the full bait-concentration curve above. Offshore and cross
+// are dampened, not penalized below the slack baseline — moving water isn't
+// harmful for shore/boat, it's just not doing the "pins bait against the
+// shore" thing onshore current does.
+function shoreOrBoatCurrentScoreOffshore(knots: number): number {
+  return interpolateCurve(knots, [
+    [0, 38],
+    [0.05, 38],
+    [0.2, 58],
+    [0.8, 58],
+    [2, 40],
+    [3, 28],
+  ]);
+}
+
+function shoreOrBoatCurrentScoreCross(knots: number): number {
+  return interpolateCurve(knots, [
+    [0, 38],
+    [0.05, 38],
+    [0.2, 70],
+    [0.8, 70],
+    [2, 42],
+    [3, 29],
+  ]);
+}
+
+/** Circular difference between the current's heading ("to") bearing and the
+ * shore's seaward aspect, 0-180°. ~0° = current heading straight onshore
+ * (toward land). ~180° = current heading straight offshore (out to sea).
+ * ~90° = running parallel to the shore. See the §4.10 comment above for why
+ * this can't reuse windShoreAngle's "from"-convention math. */
+function currentShoreAngle(currentToDeg: number, aspectDeg: number): number {
+  const landwardDeg = (aspectDeg + 180) % 360;
+  const diff = Math.abs(((currentToDeg - landwardDeg + 540) % 360) - 180);
+  return diff;
+}
+
 function spearCurrentScore(knots: number): number {
   return interpolateCurve(knots, [
     [0, 85],
@@ -565,13 +620,14 @@ function spearCurrentScore(knots: number): number {
   ]);
 }
 
-export function currentFactor(wx: WeatherHour, mode: Mode): RawFactor {
+export function currentFactor(wx: WeatherHour, mode: Mode, aspectDeg?: number): RawFactor {
   const kmh = wx.oceanCurrentVelocity;
   if (kmh === undefined) return factor("current", 42, "No current data available.", "current.noData");
   const knots = kmh / KMH_PER_KNOT;
-  const score = mode === "spearfishing" ? spearCurrentScore(knots) : shoreOrBoatCurrentScore(knots);
   const knotsParam = Math.round(knots * 100) / 100;
+
   if (mode === "spearfishing") {
+    const score = spearCurrentScore(knots);
     return factor(
       "current",
       score,
@@ -580,7 +636,28 @@ export function currentFactor(wx: WeatherHour, mode: Mode): RawFactor {
       { knots: knotsParam },
     );
   }
-  return factor("current", score, `${knots.toFixed(2)} kn current.`, "current.default", { knots: knotsParam });
+
+  if (aspectDeg === undefined || wx.oceanCurrentDirection === undefined) {
+    const score = shoreOrBoatCurrentScore(knots);
+    return factor(
+      "current",
+      score,
+      `${knots.toFixed(2)} kn current. Direction-relative-to-shore scoring needs this spot's coastline aspect.`,
+      "current.speedOnly",
+      { knots: knotsParam },
+    );
+  }
+
+  const angle = currentShoreAngle(wx.oceanCurrentDirection, aspectDeg);
+  const relation = classifyRelation(angle);
+  const score =
+    relation === "onshore"
+      ? shoreOrBoatCurrentScore(knots)
+      : relation === "offshore"
+        ? shoreOrBoatCurrentScoreOffshore(knots)
+        : shoreOrBoatCurrentScoreCross(knots);
+  const relationKey = knots < 0.05 ? "current.slack" : `current.${relation}`;
+  return factor("current", score, `${knots.toFixed(2)} kn current, ${relation}.`, relationKey, { knots: knotsParam });
 }
 
 // --- 4.11 Seasonality (v1: coarse month + SST, no species) -------------------

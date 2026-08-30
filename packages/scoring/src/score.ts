@@ -71,7 +71,7 @@ export function scoreHour(
     lightWindow(wx, sunMoon.sun, mode),
     precipitationFactor(wx),
     solunarFactor(wx, sunMoon),
-    currentFactor(wx, mode),
+    currentFactor(wx, mode, aspectDeg),
     seasonality(wx),
   ];
 

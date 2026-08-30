@@ -51,3 +51,52 @@ export async function cached<T>(
     throw err;
   }
 }
+
+/**
+ * Same cache-aside contract as `cached`, but for many grid cells at once
+ * (the wind/current/pressure map layer's refresh job, jobs/
+ * vectorFieldRefresh.ts): cache hits are served individually, every
+ * miss/stale cell is refetched in a *single* upstream call via `fetchMany`.
+ */
+export async function cachedBatch<T>(
+  points: { gridLat: number; gridLon: number }[],
+  variableSet: string,
+  ttlMs: number,
+  fetchMany: (misses: { gridLat: number; gridLon: number }[]) => Promise<T[]>,
+): Promise<Map<string, { data: T; stale: boolean }>> {
+  const result = new Map<string, { data: T; stale: boolean }>();
+  const misses: { gridLat: number; gridLon: number }[] = [];
+
+  for (const p of points) {
+    const key = `${p.gridLat},${p.gridLon}`;
+    const existing = getCached(p.gridLat, p.gridLon, variableSet);
+    if (existing && Date.now() - existing.fetchedAt < ttlMs) {
+      result.set(key, { data: existing.payload as T, stale: false });
+    } else {
+      misses.push(p);
+    }
+  }
+
+  if (misses.length === 0) return result;
+
+  try {
+    const fetched = await fetchMany(misses);
+    misses.forEach((p, i) => {
+      const key = `${p.gridLat},${p.gridLon}`;
+      const data = fetched[i];
+      if (data === undefined) return;
+      setCached(p.gridLat, p.gridLon, variableSet, data);
+      result.set(key, { data, stale: false });
+    });
+  } catch {
+    // Upstream batch failed entirely — fall back to whatever stale cache
+    // each missed cell has rather than dropping it from the response.
+    for (const p of misses) {
+      const key = `${p.gridLat},${p.gridLon}`;
+      const existing = getCached(p.gridLat, p.gridLon, variableSet);
+      if (existing) result.set(key, { data: existing.payload as T, stale: true });
+    }
+  }
+
+  return result;
+}

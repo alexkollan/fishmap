@@ -9,18 +9,22 @@ import { MapCanvas } from "@/map/MapCanvas";
 import { SpotSheet } from "@/map/SpotSheet";
 import { LayerDrawer } from "@/map/LayerDrawer";
 import { useMapLayers } from "@/map/useMapLayers";
+import { useWindyLayer } from "@/map/useWindyLayer";
 
 // MapLibre lands here as a lazy chunk (App.tsx) — no other route imports
 // anything in src/map/, so this stays the only place that pays for it
 // (DEV_PLAN.md §5.6).
 //
 // Deliberately minimal (2026-08-25 — see PROGRESS.md): no score/factor
-// overlay, no backend area grid, no time scrubber. Just the base map, a pin
-// at the active location, and tap-to-inspect via SpotSheet — the score-layer
-// pipeline this used to have was cut entirely after repeatedly running into
-// Open-Meteo free-tier rate limits with no fix that stayed simple. The
+// overlay, no time scrubber. Just the base map, a pin at the active
+// location, and tap-to-inspect via SpotSheet — the score-layer pipeline this
+// used to have was cut entirely after repeatedly running into Open-Meteo
+// free-tier rate limits with no fix that stayed simple. The
 // bathymetry/posidonia/seamarks overlay toggles are unrelated (not
-// Open-Meteo-backed) and stay.
+// Open-Meteo-backed) and stay. useWindyLayer (added later) is a separate,
+// much coarser (0.5° vs the old 0.1°) backend-precomputed grid for a purely
+// decorative wind/current/pressure layer, unrelated to scoring — see its own
+// file comment for why its rate-limit math doesn't repeat the old problem.
 export function MapPage() {
   const { location, setLocation } = useActiveLocation();
   const mode = useModeStore((s) => s.mode);
@@ -31,6 +35,7 @@ export function MapPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const layers = useMapLayers(map);
+  const windy = useWindyLayer(map);
 
   const handleReady = useCallback((m: MaplibreMap) => setMap(m), []);
 
@@ -63,7 +68,7 @@ export function MapPage() {
         </div>
 
         {drawerOpen && (
-          <LayerDrawer overlays={layers.overlays} onToggleOverlay={layers.toggleOverlay} onClose={() => setDrawerOpen(false)} />
+          <LayerDrawer overlays={layers.overlays} onToggleOverlay={layers.toggleOverlay} onClose={() => setDrawerOpen(false)} windy={windy} />
         )}
 
         {sheet && <SpotSheet location={sheet} mode={mode} onClose={() => setSheet(null)} />}

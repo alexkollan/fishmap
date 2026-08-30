@@ -81,7 +81,7 @@ export interface Dictionary {
     light: { dawn: string; dusk: string; night: string; daytime: string; daytimeOvercast: string; spearMidday: string };
     precipitation: { noData: string; value: string };
     solunar: { phase: string; activeMajor: string; activeMinor: string; alignsWithTwilight: string };
-    current: { noData: string; spear: string; default: string };
+    current: { noData: string; spear: string; speedOnly: string; onshore: string; offshore: string; cross: string; slack: string };
     seasonality: { value: string };
   };
   /** Templates for VetoInfo.key. */
@@ -109,6 +109,11 @@ export interface Dictionary {
     layers: string;
     overlays: string;
     overlayLabels: { bathymetry: string; posidonia: string; seamarks: string };
+    windy: {
+      title: string;
+      particleModes: { off: string; wind: string; current: string };
+      pressure: string;
+    };
   };
   wind: {
     speed: string;
@@ -418,7 +423,11 @@ export const dictionaries: Record<Locale, Dictionary> = {
       current: {
         noData: "No current data available.",
         spear: "{knots} kn current — slack water gives the best visibility and easiest diving.",
-        default: "{knots} kn current.",
+        speedOnly: "{knots} kn current. Direction-relative-to-shore scoring needs this spot's coastline aspect.",
+        onshore: "{knots} kn current, onshore — pushing bait against the shore.",
+        offshore: "{knots} kn current, offshore — pulling away from the shore.",
+        cross: "{knots} kn current, cross-shore.",
+        slack: "{knots} kn current, near slack.",
       },
       seasonality: {
         value: "{month} — general Greek coastal fishery activity.",
@@ -459,6 +468,11 @@ export const dictionaries: Record<Locale, Dictionary> = {
         bathymetry: "Bathymetry (depth)",
         posidonia: "Posidonia / seabed habitat",
         seamarks: "Seamarks",
+      },
+      windy: {
+        title: "Wind / current / pressure",
+        particleModes: { off: "Particles: off", wind: "Particles: wind", current: "Particles: current" },
+        pressure: "Pressure shading",
       },
     },
     wind: {
@@ -771,7 +785,11 @@ export const dictionaries: Record<Locale, Dictionary> = {
       current: {
         noData: "Δεν υπάρχουν διαθέσιμα δεδομένα ρεύματος.",
         spear: "Ρεύμα {knots} kn — το ήρεμο νερό δίνει την καλύτερη ορατότητα και την ευκολότερη κατάδυση.",
-        default: "Ρεύμα {knots} kn.",
+        speedOnly: "Ρεύμα {knots} kn. Η βαθμολόγηση ως προς την κατεύθυνση της ακτής χρειάζεται τον προσανατολισμό αυτού του σημείου.",
+        onshore: "Ρεύμα {knots} kn, προς τη στεριά — σπρώχνει την τροφή προς την ακτή.",
+        offshore: "Ρεύμα {knots} kn, προς το πέλαγος — απομακρύνεται από την ακτή.",
+        cross: "Ρεύμα {knots} kn, παράλληλα με την ακτή.",
+        slack: "Ρεύμα {knots} kn, σχεδόν άπνοιο.",
       },
       seasonality: {
         value: "{month} — γενική δραστηριότητα ελληνικής παράκτιας αλιείας.",
@@ -812,6 +830,11 @@ export const dictionaries: Record<Locale, Dictionary> = {
         bathymetry: "Βαθυμετρία (βάθος)",
         posidonia: "Ποσειδωνία / βυθός",
         seamarks: "Ναυτικά σημάδια",
+      },
+      windy: {
+        title: "Άνεμος / ρεύμα / πίεση",
+        particleModes: { off: "Σωματίδια: ανενεργά", wind: "Σωματίδια: άνεμος", current: "Σωματίδια: ρεύμα" },
+        pressure: "Σκίαση πίεσης",
       },
     },
     wind: {
