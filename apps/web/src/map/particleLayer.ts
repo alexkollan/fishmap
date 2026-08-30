@@ -7,9 +7,7 @@ import { MercatorCoordinate, type CustomLayerInterface, type CustomRenderMethodI
 // code to get right with no way to visually verify it from this environment.
 // Points still read clearly as flow once animated (the same simplification
 // several lightweight wind-viz plugins use) — trails are a reasonable v2 if
-// wanted after this ships and gets eyeballed live (DEV_PLAN.md §6.4/§8: this
-// whole layer sits behind the admin-only `windParticles` flag specifically
-// so frame cost/look can be judged before any wider rollout).
+// wanted after this ships and gets eyeballed live.
 
 export interface VectorSample {
   u: number; // km/h (Open-Meteo's default unit), mercator +x direction

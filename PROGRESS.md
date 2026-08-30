@@ -10,6 +10,14 @@ Purpose: let any Claude Code session (or human) pick up this project cold and kn
 
 ---
 
+## Windy layer un-gated — made public, not behind `windParticles` (2026-08-30)
+
+Follow-up to the entry below, same day. Shipped the wind/current/pressure layer behind the pre-existing `windParticles` admin-only flag, matching that flag's original seed intent (DEV_PLAN.md §6.4/§8: "prove frame cost before wider rollout"). User tried it on the deployed site, hit the admin login wall, and pointed out directly they'd never set a production admin password and didn't want one required for a decorative map layer.
+
+Removed the `useFlag("windParticles")` check from `apps/web/src/map/useWindyLayer.ts` entirely — the layer (particle toggle + pressure toggle in the Layer Drawer) is now visible to every visitor, no login needed. `windParticles` itself is untouched in the DB (still seeded `admin_only`, just no longer read by anything) — left alone rather than deleted, in case a future feature actually wants a real admin-gated rollout. Data still isn't fetched unless a visitor toggles something on, so this stays cheap regardless of being public.
+
+**Verified**: `pnpm typecheck` green across all packages after the change.
+
 ## Windy-style wind/current/pressure map layer added — behind the existing `windParticles` flag (2026-08-30)
 
 User asked for a Windy.com-style animated layer on `/map` (particle flows for wind/current, plus pressure shading) — purely visual, unrelated to scoring. This directly risked repeating the exact failure mode below (the map's scoring overlays were fully removed twice after a 0.1° grid took a 115-minute cold sweep and kept tripping Open-Meteo's free-tier rate limit). Fixed the resolution/variable count this time instead of hoping a similar design would somehow behave differently:

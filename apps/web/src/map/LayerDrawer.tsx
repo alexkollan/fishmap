@@ -7,7 +7,6 @@ interface LayerDrawerProps {
   onToggleOverlay: (key: keyof OverlayState) => void;
   onClose: () => void;
   windy?: {
-    enabled: boolean;
     particleMode: ParticleMode;
     setParticleMode: (mode: ParticleMode) => void;
     pressureOn: boolean;
@@ -44,7 +43,7 @@ export function LayerDrawer({ overlays, onToggleOverlay, onClose, windy }: Layer
         ))}
       </div>
 
-      {windy?.enabled && (
+      {windy && (
         <>
           <p className="mb-1 mt-3 text-xs font-medium uppercase tracking-wide text-ink-muted">{t.map.windy.title}</p>
           <div className="flex flex-col gap-1">

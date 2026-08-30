@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ImageSource, Map as MaplibreMap } from "maplibre-gl";
-import { useFlag } from "@/lib/flags";
 import { fetchVectorField, GridField, currentToFromBearing, pressureToColor, type VectorFieldResponse } from "./windyField";
 import { WindParticleLayer, type VectorSample } from "./particleLayer";
 import { OVERLAY_LAYER_IDS } from "./useMapLayers";
@@ -89,19 +88,19 @@ function buildPressureCanvas(field: VectorFieldResponse): HTMLCanvasElement {
 
 /**
  * Wires the wind/current particle layer + pressure gradient layer onto the
- * map — purely visual (Windy-style), unrelated to scoring. Behind the
- * `windParticles` flag (admin-only until frame cost/look is judged live, see
- * DEV_PLAN.md §6.4/§8) — data isn't even fetched unless the flag is on and
- * at least one of the two is toggled on.
+ * map — purely visual (Windy-style), unrelated to scoring. Publicly
+ * available to every visitor (not gated behind the `windParticles` admin
+ * flag — that was this feature's original default, deliberately removed per
+ * explicit user direction, see PROGRESS.md). Data isn't fetched unless the
+ * visitor actually toggles particles or pressure on.
  */
 export function useWindyLayer(map: MaplibreMap | null) {
-  const enabled = useFlag("windParticles");
   const particleMode = useWindyStore((s) => s.particleMode);
   const setParticleMode = useWindyStore((s) => s.setParticleMode);
   const pressureOn = useWindyStore((s) => s.pressureOn);
   const togglePressure = useWindyStore((s) => s.togglePressure);
 
-  const wantsData = enabled && (particleMode !== "off" || pressureOn);
+  const wantsData = particleMode !== "off" || pressureOn;
   const { data: field } = useQuery({
     queryKey: ["vectorField"],
     queryFn: fetchVectorField,
@@ -190,5 +189,5 @@ export function useWindyLayer(map: MaplibreMap | null) {
     };
   }, [map]);
 
-  return { enabled, particleMode, setParticleMode, pressureOn, togglePressure };
+  return { particleMode, setParticleMode, pressureOn, togglePressure };
 }

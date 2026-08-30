@@ -96,7 +96,7 @@ The map has no *scoring* on it in any form — no coastline line, no factor/weat
 
 Wind *scoring* on the map (via `SpotSheet`) is therefore always speed-only, no coastline aspect to be relative to — same as every single-point page; this was already true before the final cut, unaffected by it. `currentFactor()`/`windRelative()` in `packages/scoring/src/factors.ts` do both support an optional `aspectDeg` for onshore/offshore-relative scoring, but nothing in the running app calls `scoreHour` with a real one — dormant capability, not wired to anything (added 2026-08-30, see `PROGRESS.md`).
 
-### Wind/current/pressure map layer — decorative, unrelated to scoring, behind `windParticles` (2026-08-30)
+### Wind/current/pressure map layer — decorative, unrelated to scoring, public (2026-08-30)
 
 Separate from everything above: `/map`'s Layer Drawer has a Windy.com-style animated layer — particle flows for wind/current (a MapLibre `CustomLayerInterface` WebGL2 layer, `apps/web/src/map/particleLayer.ts`) and a static color gradient for pressure (an `image` source, `apps/web/src/map/useWindyLayer.ts`). **Purely visual — no factor here feeds `scoreHour` or any score, and this doesn't contradict "the map has no scoring on it."**
 
@@ -104,7 +104,7 @@ Backed by its own backend-precomputed grid (`apps/api/src/lib/areaGrid.ts`, `ARE
 
 No land masking: the Marine API naturally returns null over land (no current data there), which is enough to skip those cells for the current layer for free; wind/pressure (Forecast API) have real data over land too and render there, same as Windy itself does for wind.
 
-Gated behind the `windParticles` feature flag (seeded `admin_only` in `db/index.ts`, existed unused since a much earlier session, DEV_PLAN.md §6.4/§8) — data isn't fetched client-side at all unless the flag is on and at least one of particles/pressure is toggled. **Not yet verified**: actual frame cost/animation quality — needs a real browser, which building this session couldn't check. Judge that live before considering the flag safe to widen past admin-only.
+**Public — not gated behind the `windParticles` flag.** It shipped that way initially (matching that flag's original `admin_only` seed and DEV_PLAN.md §6.4/§8's "prove frame cost first" caution), but the user explicitly rejected requiring an admin login for a decorative layer they'd never set a production admin password for — removed the `useFlag("windParticles")` check the same day. `windParticles` itself is untouched in the DB (still seeded, still `admin_only`, still the only row in `feature_flags` — just unread by this layer now). Data isn't fetched client-side unless a visitor actually toggles particles or pressure on, so this stays cheap even fully public. **Not yet verified**: actual frame cost/animation quality — needs a real browser, which building this session couldn't check. Judge that live now that anyone can trigger it.
 
 ### Admin, feature flags, and the live weight editor
 
@@ -112,7 +112,7 @@ Gated behind the `windParticles` feature flag (seeded `admin_only` in `db/index.
 
 **The live weight editor is genuinely live, app-wide, not just an admin preview.** `weight_overrides` rows (per mode) are merged with `DEFAULT_WEIGHT_PROFILES` behind a *public* `GET /api/weights`, and `apps/web/src/lib/weightProfiles.ts`'s `useWeightProfiles()` is what `useConditions` and `useBestWindows` actually score against — neither imports `DEFAULT_WEIGHT_PROFILES` directly for scoring anymore (packages/scoring still exports it as the fallback). If you add a new place that calls `scoreHour`, route its weight profile through `useWeightProfiles()`, not the static default, or an admin's edit silently won't apply there.
 
-Feature flags (`feature_flags` table, `GET /api/flags`, `useFlag()`) exist and work; only one flag (`windParticles`) is seeded, and nothing is actually gated behind it yet — no particle animation was built this session.
+Feature flags (`feature_flags` table, `GET /api/flags`, `useFlag()`) exist and work; only one flag (`windParticles`) is seeded, and nothing is actually gated behind it — a particle animation was built (see the map layer section above) but shipped public rather than behind this flag, per explicit user direction.
 
 ### Translated factor notes — `noteKey`/`noteParams`, not raw strings
 
