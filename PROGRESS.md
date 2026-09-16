@@ -10,6 +10,23 @@ Purpose: let any Claude Code session (or human) pick up this project cold and kn
 
 ---
 
+## Depth-data provenance surfaced per spot (2026-09-17)
+
+Follow-on from the C-MAP comparison. Investigating *why* our depths differed turned up something more useful than the answer itself: **EMODnet's Greek coverage is a patchwork, and we were rendering all of it with identical confidence.** Sampled via its `source_references` layer:
+
+| Location | Source | Reality |
+|---|---|---|
+| St John's Bay (the user's screenshot) | EOMAP (EDMO 4667) | **satellite-derived**, not surveyed |
+| Thermaikos | HCMR / HNODC (EDMO 269) | real survey — Greek national data |
+| Patras gulf | GEBCO2024 | ~450 m global grid |
+| Kea, Rhodes, Corfu, Crete N | no source polygon | global fallback |
+
+That explains the user's bay exactly: those depths are inferred from water colour, not measured. New `GET /api/bathy/source?lat&lon` proxies EMODnet's GetFeatureInfo, classifies into survey / satellite / global, and caches a week (the data is static); `SpotDetails` renders a plain-language line so someone about to wade out knows whether the 5 m contour was measured or estimated. Rendering a coarse global model identically to a real survey is worse than being uniformly coarse — it invites trust the data hasn't earned.
+
+Chose this over EMODnet's `quality_index` raster overlay: that layer is real and informative (dark bands are actual survey tracks, hatching is interpolated) but it's a light-palette full-coverage image that would wash out the dark basemap exactly as `mean_atlas_land` did. Per-spot provenance is more actionable for a fisherman and far less intrusive. The overlay stays available if a visual version is ever wanted.
+
+**Licensing, since the user asked whether C-MAP's Greek sources are usable:** they are not equivalent. **HNHS** (Hellenic Navy Hydrographic Service) is the accurate one and is *not* open — C-MAP's own attribution says "reproduced with the permission of … licence no. 859.1/2/1405/S.371/02-03-23", i.e. a negotiated commercial licence. Using it without our own would be infringement; applying to HNHS is a business decision, not an engineering one. **HCMR / HNODC** is CC-BY 4.0 and genuinely open — but **we already have it**, since EMODnet ingests it (confirmed at Thermaikos, EDMO 269). **Eagleray LP** is a commercial survey contractor. So there is no free accuracy upgrade available by switching source.
+
 ## Depth contours: finer, deeper, smoothed — and a georeferencing scare (2026-09-17, later)
 
 User feedback after using the layer: it stops at 200 m, it isn't detailed enough inshore compared to C-MAP, and *"our numbers are super off… actually wrong"*, with side-by-side C-MAP and Fishmap screenshots of St John's Bay (Ormos Agiou Ioannou, ~37.664/23.955).

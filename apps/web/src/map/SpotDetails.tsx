@@ -4,6 +4,7 @@ import { useI18n } from "@/lib/i18n";
 import { renderVetoNote } from "@/lib/i18n/renderFactorNote";
 import { formatLocalTime } from "@/lib/formatTime";
 import { FactorBreakdown } from "@/ui/FactorBreakdown";
+import { useBathySource } from "./useBathySource";
 
 interface SpotDetailsProps {
   location: ActiveLocation;
@@ -30,6 +31,7 @@ const CONDITION_LINKS: { to: string; labelKey: "wind" | "sea" | "pressure" | "sk
 // to "now".
 export function SpotDetails({ location, result, sunMoon }: SpotDetailsProps) {
   const { t, locale } = useI18n();
+  const { data: bathy } = useBathySource(location.lat, location.lon);
   const search = `?lat=${location.lat}&lon=${location.lon}&name=${encodeURIComponent(location.name)}`;
 
   return (
@@ -52,6 +54,12 @@ export function SpotDetails({ location, result, sunMoon }: SpotDetailsProps) {
           {t.sunMoon.sunset} {formatLocalTime(sunMoon.sun.sunset, locale)}
         </span>
       </div>
+
+      {bathy && bathy.quality !== "unknown" && (
+        <p className="text-xs leading-snug text-ink-muted/80">
+          {t.map.depthSource[bathy.quality].replace("{source}", bathy.organisation ?? bathy.identifier ?? "")}
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {CONDITION_LINKS.map((link) => (

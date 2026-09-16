@@ -9,6 +9,7 @@ import { spotsRoutes } from "./routes/spots.js";
 import { pushRoutes } from "./routes/push.js";
 import { miscRoutes } from "./routes/misc.js";
 import { fieldRoutes } from "./routes/fields.js";
+import { bathyRoutes } from "./routes/bathy.js";
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -27,6 +28,7 @@ export function buildApp() {
   app.register(pushRoutes);
   app.register(miscRoutes);
   app.register(fieldRoutes);
+  app.register(bathyRoutes);
 
   return app;
 }

@@ -142,6 +142,8 @@ export interface Dictionary {
     hideDetails: string;
     scrubberLabel: string;
     approximateLocation: string;
+    /** Depth-data provenance for the pinned point, keyed by quality tier. */
+    depthSource: { survey: string; satellite: string; global: string; unknown: string };
     layers: string;
     overlays: string;
     overlayLabels: { bathymetry: string; posidonia: string; seamarks: string };
@@ -533,6 +535,12 @@ export const dictionaries: Record<Locale, Dictionary> = {
       hideDetails: "Hide details",
       scrubberLabel: "Scrub the forecast to see how the score changes over time",
       approximateLocation: "approximate",
+      depthSource: {
+        survey: "Depths here come from a real survey ({source}).",
+        satellite: "Depths here are estimated from satellite imagery ({source}), not surveyed — treat the shallow contours with caution.",
+        global: "No detailed survey here: depths come from a coarse global model (~450 m), so the contours are indicative only.",
+        unknown: "",
+      },
       layers: "Layers",
       overlays: "Overlays",
       overlayLabels: {
@@ -932,6 +940,12 @@ export const dictionaries: Record<Locale, Dictionary> = {
       hideDetails: "Απόκρυψη λεπτομερειών",
       scrubberLabel: "Μετακινήστε την μπάρα για να δείτε πώς αλλάζει η βαθμολογία με τον χρόνο",
       approximateLocation: "κατά προσέγγιση",
+      depthSource: {
+        survey: "Τα βάθη εδώ προέρχονται από πραγματική υδρογραφική αποτύπωση ({source}).",
+        satellite: "Τα βάθη εδώ εκτιμώνται από δορυφορικές εικόνες ({source}), δεν έχουν αποτυπωθεί — προσοχή στις ρηχές ισοβαθείς.",
+        global: "Δεν υπάρχει λεπτομερής αποτύπωση εδώ: τα βάθη προέρχονται από αδρό παγκόσμιο μοντέλο (~450 μ), οπότε οι καμπύλες είναι ενδεικτικές.",
+        unknown: "",
+      },
       layers: "Επίπεδα",
       overlays: "Επικαλύψεις",
       overlayLabels: {
