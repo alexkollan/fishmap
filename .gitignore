@@ -13,3 +13,8 @@ coverage/
 apps/api/data/
 tools/coastline-pipeline/output/
 tools/coastline-pipeline/cache/
+
+# Reference screenshots dropped in for one-off comparisons (incl. third-party
+# product UI) — keep them local, not in history.
+/c-mapdepth.png
+/fishmapdepth.png
