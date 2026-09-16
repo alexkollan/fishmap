@@ -30,6 +30,8 @@ Runs once per tab (sessionStorage) and never overrides a deliberate choice, whic
 
 **NOT verified — needs a real browser.** No browser automation available in this session, so nothing here has been looked at: scrubber drag feel on touch, the custom slider thumb rendering across browsers, panel height against the map on a small phone, whether the day labels collide at 156 hours, and the auto-locate path end to end (both the already-granted GPS branch and the IP fallback). Treat item 2 as "builds and the maths is right", not "works".
 
+**Part 3 of the same idea — an all-Greece per-parameter score heatmap — is researched but deliberately not built.** Written up in `FEATURE_SCORE_HEATMAP.md`. Headline: the 115-minute failure that killed map-wide scoring twice was an *unmasked* rectangle fetching 26 variables, 11 of which scoring never reads. Masking to within 15 km of coast (measured against the orphaned `coastline.geojson`) and trimming to the 15 variables actually used gives **467 cells at 0.25°, ~29× less load than the design that died** and roughly 4× the load of the wind layer that currently sweeps in under 25 seconds. One decision is open and blocks the build — whether coarse ~25 km regional guidance is enough for v1, or cove-level detail is the whole point — see that file's §7.
+
 ## Weights are now contextual, not static per mode (2026-09-16)
 
 User's push: static per-mode weights aren't realistic. Their worked example — midday is a hard negative for shore fishing, but put clouds over it and the time of day "plays a significantly lower role," because less light means fish don't retreat deep at 13:00. Generalised: **a factor's weight should track how much information it's currently carrying, and that's a function of the other factors.**
