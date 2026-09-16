@@ -24,6 +24,60 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Map time scrubber. The track is transparent because the score gradient
+   strip sits behind the input — the range element is purely the handle and
+   the hit area, which is also why the hit area is deliberately taller than
+   the visible strip (comfortable thumb-dragging on a phone). */
+.time-scrubber {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.time-scrubber:focus {
+  outline: none;
+}
+
+.time-scrubber::-webkit-slider-runnable-track {
+  height: 2.25rem;
+  background: transparent;
+}
+
+.time-scrubber::-moz-range-track {
+  height: 2.25rem;
+  background: transparent;
+}
+
+.time-scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.5rem;
+  height: 2.25rem;
+  border-radius: 0.25rem;
+  background: var(--color-ink);
+  border: 2px solid var(--color-ground);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.5);
+}
+
+.time-scrubber::-moz-range-thumb {
+  width: 0.5rem;
+  height: 2.25rem;
+  border-radius: 0.25rem;
+  background: var(--color-ink);
+  border: 2px solid var(--color-ground);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.5);
+}
+
+.time-scrubber:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px var(--color-score-good);
+}
+
+.time-scrubber:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 2px var(--color-score-good);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

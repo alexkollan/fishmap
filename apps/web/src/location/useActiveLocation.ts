@@ -1,11 +1,24 @@
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { ActiveLocation } from "@fishmap/types";
-import { useLocationStore } from "./store";
+import { useLocationStore, type LocationSource } from "./store";
 
 // Central Aegean-facing default so the app is usable before any location
 // has ever been picked (DEV_PLAN.md §7.3 fallback chain, last resort).
 export const DEFAULT_LOCATION: ActiveLocation = { lat: 37.9838, lon: 23.7275, name: "Athens" };
+
+/** Whether the app was *opened* on a URL that already named a location —
+ * i.e. a shared or bookmarked deep link, which must always win over the
+ * map's landing auto-locate (useVisitorLocation).
+ *
+ * Captured at module scope on purpose. This module is pulled in at boot via
+ * App.tsx → AppShell → Header, so it reads the URL before the sync effect
+ * below has had a chance to write coordinates into it — by the time any
+ * component could ask, the answer would otherwise always be "yes". */
+export const INITIAL_URL_HAD_COORDS = (() => {
+  const params = new URLSearchParams(window.location.search);
+  return params.has("lat") && params.has("lon");
+})();
 
 /**
  * The single source of truth for "where is the app currently looking".
@@ -35,7 +48,9 @@ export function useActiveLocation() {
     }
 
     const fallback = location ?? DEFAULT_LOCATION;
-    if (!location) setLocationInStore(fallback);
+    // "auto": the app picked this, not the visitor, so the map's landing
+    // auto-locate is allowed to replace it (see useVisitorLocation).
+    if (!location) setLocationInStore(fallback, "auto");
 
     const next = new URLSearchParams(searchParams);
     next.set("lat", String(fallback.lat));
@@ -47,8 +62,8 @@ export function useActiveLocation() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  function setLocation(next: ActiveLocation) {
-    setLocationInStore(next);
+  function setLocation(next: ActiveLocation, source: LocationSource = "manual") {
+    setLocationInStore(next, source);
     const params = new URLSearchParams(searchParams);
     params.set("lat", String(next.lat));
     params.set("lon", String(next.lon));

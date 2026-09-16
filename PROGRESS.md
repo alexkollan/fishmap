@@ -10,6 +10,26 @@ Purpose: let any Claude Code session (or human) pick up this project cold and kn
 
 ---
 
+## Map is the homepage, with a Windy-style score time scrubber (2026-09-16)
+
+User's friend's idea, in two parts (a third — a full-Greece parameter heatmap — is **planned but explicitly not implemented**, see "Open items").
+
+**1. Map is the landing route and first tab.** `/` renders `MapPage`, Today moved to `/today`, and `/map` is a permanent redirect to `/` preserving the query string (`LegacyMapRedirect` in `App.tsx` — the location lives in the URL, so it has to survive the hop; shared links and any PWA start_url captured earlier still point there). `MapPage` stays `React.lazy()` even as the homepage: the chunk boundary keeps MapLibre off every other route, which is worth more than saving a Suspense flash.
+
+**Landing auto-locate** (`location/useVisitorLocation.ts`) puts the pin on the visitor — but **without ever prompting on page load**, since DEV_PLAN.md §7.3 and `location/geolocation.ts` both say the permission dialog belongs behind a user gesture, and a prompt firing over a map nobody has looked at yet is exactly what that rule is for. Resolution order: precise GPS *only* if `permissions.query` already says `"granted"` (silent, no dialog — a returning visitor who opted in once gets their real position), else the permission-free IP lookup (city-level, already the §7.3 fallback and the right order of magnitude for "which bit of coast"), else whatever was stored. The on-map button is the gesture path that may prompt.
+
+Runs once per tab (sessionStorage) and never overrides a deliberate choice, which needed two supporting bits: `LocationSource` (`"auto"` | `"manual"`) on the location store, and `INITIAL_URL_HAD_COORDS` in `useActiveLocation.ts` — module-scope on purpose, because that module is imported at boot via App → AppShell → Header and has to read the URL *before* the sync effect writes coordinates into it, or the answer would always be "yes, deep link". Legacy persisted state (no `source`) is treated as `"auto"`: before this existed the common case was the app writing its own Athens default, not a deliberate pick.
+
+**2. Permanent bottom panel with a time scrubber.** `MapScorePanel.tsx` (score + scrubber + expandable details) and `TimeScrubber.tsx` (the strip). The strip renders the *whole forecast's* score as a hard-stop colour gradient, so "when should I go this week" is answerable at a glance before dragging anything; day separators and weekday labels keep 156 hours legible. The map area shrinks via flex to make room.
+
+**This costs zero extra API requests.** `useConditions` already scores every hour of the series for the hourly charts — the scrubber is a second view of numbers the app had already computed. It's one single-point `GET /api/weather` for the pin, same as every other page, so it does **not** reopen the rate-limit problem that killed the map's score layers twice; that was about scoring many points at once. Selected time is owned by `MapPage` and survives moving the pin (comparing Saturday afternoon between spots is the point), and sun/moon in the expanded details follows the scrubber rather than today.
+
+`SpotSheet.tsx` became `SpotDetails.tsx` — now purely presentational and rendering whichever hour the scrubber is on, as the panel's expanded body, rather than being its own competing bottom sheet.
+
+**Verified**: `pnpm typecheck` and `pnpm build` green. Scrubber maths checked against a real 216-hour Open-Meteo series: nowIndex 60, 156 scrubbable hours, 7 day marks at correct 24h spacing, score range 45–75 across the window (so the gradient shows real variation, not a flat band), ~7 KB memoised gradient string. Caught and fixed one real bug during review: `handleLocated` was memoised with `[]` deps over a `setLocation` that closes over search params — a stale-URL write waiting to happen.
+
+**NOT verified — needs a real browser.** No browser automation available in this session, so nothing here has been looked at: scrubber drag feel on touch, the custom slider thumb rendering across browsers, panel height against the map on a small phone, whether the day labels collide at 156 hours, and the auto-locate path end to end (both the already-granted GPS branch and the IP fallback). Treat item 2 as "builds and the maths is right", not "works".
+
 ## Weights are now contextual, not static per mode (2026-09-16)
 
 User's push: static per-mode weights aren't realistic. Their worked example — midday is a hard negative for shore fishing, but put clouds over it and the time of day "plays a significantly lower role," because less light means fish don't retreat deep at 13:00. Generalised: **a factor's weight should track how much information it's currently carrying, and that's a function of the other factors.**

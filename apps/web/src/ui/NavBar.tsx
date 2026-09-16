@@ -9,17 +9,18 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 export function NavBar() {
   const { t } = useI18n();
 
+  // Map leads — it's the landing route as of 2026-09-16.
   const mobileTabs = [
-    { to: "/", label: t.nav.today },
-    { to: "/map", label: t.nav.map },
+    { to: "/", label: t.nav.map },
+    { to: "/today", label: t.nav.today },
     { to: "/forecast", label: t.nav.forecast },
     { to: "/spots", label: t.nav.spots },
     { to: "/settings", label: t.nav.settings },
   ];
 
   const desktopLinks = [
-    { to: "/", label: t.nav.today },
-    { to: "/map", label: t.nav.map },
+    { to: "/", label: t.nav.map },
+    { to: "/today", label: t.nav.today },
     { to: "/forecast", label: t.nav.forecast },
     { to: "/conditions/wind", label: t.nav.conditions.wind },
     { to: "/conditions/sea", label: t.nav.conditions.sea },

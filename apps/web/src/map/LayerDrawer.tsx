@@ -20,7 +20,7 @@ const PARTICLE_MODES: ParticleMode[] = ["off", "wind", "current"];
 // Map overlay control (DEV_PLAN.md §6.4): independent raster layers drawn on
 // top of the base map. The score/factor overlay this drawer used to also
 // control was removed 2026-08-25 — see PROGRESS.md — the map now only does
-// tap-to-inspect via SpotSheet. State persists to localStorage via useMapLayers.
+// tap-to-inspect via MapScorePanel. State persists to localStorage via useMapLayers.
 export function LayerDrawer({ overlays, onToggleOverlay, onClose, windy }: LayerDrawerProps) {
   const { t } = useI18n();
 

@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { I18nProvider, useI18n } from "@/lib/i18n";
 import { AnalyticsProvider } from "@/lib/analytics/AnalyticsProvider";
 import { AnalyticsTracker } from "@/lib/analytics/AnalyticsTracker";
@@ -28,6 +28,15 @@ function LazyPageFallback() {
   return <div className="px-4 py-6 text-ink-muted">{t.common.loading}</div>;
 }
 
+// /map was the map's home until 2026-09-16, when it became the app's landing
+// route. Kept as a redirect rather than deleted: shared links and any
+// installed PWA whose start_url was captured earlier still point at it, and
+// the location lives in the query string, so it has to survive the hop.
+function LegacyMapRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={{ pathname: "/", search }} replace />;
+}
+
 export function App() {
   return (
     <I18nProvider>
@@ -36,8 +45,9 @@ export function App() {
         <Suspense fallback={<LazyPageFallback />}>
           <Routes>
             <Route element={<AppShell />}>
-              <Route path="/" element={<TodayPage />} />
-              <Route path="/map" element={<MapPage />} />
+              <Route path="/" element={<MapPage />} />
+              <Route path="/today" element={<TodayPage />} />
+              <Route path="/map" element={<LegacyMapRedirect />} />
               <Route path="/forecast" element={<ForecastPage />} />
               <Route path="/conditions/wind" element={<WindPage />} />
               <Route path="/conditions/sea" element={<SeaPage />} />

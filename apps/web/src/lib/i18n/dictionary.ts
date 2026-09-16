@@ -133,6 +133,12 @@ export interface Dictionary {
   };
   map: {
     closeSheet: string;
+    now: string;
+    backToNow: string;
+    showDetails: string;
+    hideDetails: string;
+    scrubberLabel: string;
+    approximateLocation: string;
     layers: string;
     overlays: string;
     overlayLabels: { bathymetry: string; posidonia: string; seamarks: string };
@@ -515,6 +521,12 @@ export const dictionaries: Record<Locale, Dictionary> = {
     },
     map: {
       closeSheet: "Close",
+      now: "Now",
+      backToNow: "Now",
+      showDetails: "Why this score",
+      hideDetails: "Hide details",
+      scrubberLabel: "Scrub the forecast to see how the score changes over time",
+      approximateLocation: "approximate",
       layers: "Layers",
       overlays: "Overlays",
       overlayLabels: {
@@ -905,6 +917,12 @@ export const dictionaries: Record<Locale, Dictionary> = {
     },
     map: {
       closeSheet: "Κλείσιμο",
+      now: "Τώρα",
+      backToNow: "Τώρα",
+      showDetails: "Γιατί αυτή η βαθμολογία",
+      hideDetails: "Απόκρυψη λεπτομερειών",
+      scrubberLabel: "Μετακινήστε την μπάρα για να δείτε πώς αλλάζει η βαθμολογία με τον χρόνο",
+      approximateLocation: "κατά προσέγγιση",
       layers: "Επίπεδα",
       overlays: "Επικαλύψεις",
       overlayLabels: {
