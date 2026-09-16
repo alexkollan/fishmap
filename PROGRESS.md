@@ -12,6 +12,8 @@ Purpose: let any Claude Code session (or human) pick up this project cold and kn
 
 ## Map is the homepage, with a Windy-style score time scrubber (2026-09-16)
 
+**Pushed to `origin/main` 2026-09-16** — this entry, the contextual-weights entry below, and `FEATURE_SCORE_HEATMAP.md` are all live on the remote (`0ecfbb0`, `0ac1c68`, `d7ede9f`). Note that means the **unverified-in-a-browser** caveat at the end of this entry is now on main, not sitting in a local branch: the browser check is still outstanding, and this is the first deploy where the landing route, the auto-locate path and the scrubber reach real visitors.
+
 User's friend's idea, in two parts (a third — a full-Greece parameter heatmap — is **planned but explicitly not implemented**, see "Open items").
 
 **1. Map is the landing route and first tab.** `/` renders `MapPage`, Today moved to `/today`, and `/map` is a permanent redirect to `/` preserving the query string (`LegacyMapRedirect` in `App.tsx` — the location lives in the URL, so it has to survive the hop; shared links and any PWA start_url captured earlier still point there). `MapPage` stays `React.lazy()` even as the homepage: the chunk boundary keeps MapLibre off every other route, which is worth more than saving a Suspense flash.
