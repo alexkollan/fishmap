@@ -25,6 +25,14 @@ export function MapCanvas({ center, onReady, onTap }: MapCanvasProps) {
   const mapRef = useRef<MaplibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
   const [pinned, setPinned] = useState(false);
+  // State, not just the ref, so the marker effect below re-runs once the
+  // style has loaded. Without it the marker was simply never placed on
+  // arrival: the effect runs before `load` fires, bails on a null map, and
+  // then has no reason to run again because `center` hasn't changed since.
+  // It only ever appeared if you moved the pin yourself — which stopped
+  // being acceptable when the map became the landing route and the pin
+  // became the whole point.
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -45,6 +53,7 @@ export function MapCanvas({ center, onReady, onTap }: MapCanvasProps) {
 
     map.on("load", () => {
       mapRef.current = map;
+      setReady(true);
       onReady(map);
     });
 
@@ -56,6 +65,7 @@ export function MapCanvas({ center, onReady, onTap }: MapCanvasProps) {
     return () => {
       map.remove();
       mapRef.current = null;
+      setReady(false);
     };
     // Only ever constructed once — `center` seeds the initial view only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -64,7 +74,7 @@ export function MapCanvas({ center, onReady, onTap }: MapCanvasProps) {
   // Drop/move a marker at the active location without re-creating the map.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !ready) return;
     if (!markerRef.current) {
       markerRef.current = new Marker({ color: "#4ade80" });
     }
@@ -72,7 +82,7 @@ export function MapCanvas({ center, onReady, onTap }: MapCanvasProps) {
     if (!pinned) {
       map.easeTo({ center: [center.lon, center.lat], duration: 400 });
     }
-  }, [center, pinned]);
+  }, [center, pinned, ready]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }

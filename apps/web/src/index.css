@@ -24,16 +24,18 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Map time scrubber. The track is transparent because the score gradient
-   strip sits behind the input — the range element is purely the handle and
-   the hit area, which is also why the hit area is deliberately taller than
-   the visible strip (comfortable thumb-dragging on a phone). */
+/* Map time scrubber. The element is a transparent interaction surface laid
+   over the SVG strip: TimeScrubber draws its own playhead, so the native
+   thumb is invisible but kept wide enough to be a comfortable touch target
+   (the visible playhead is 2px, which nobody could grab). Focus is shown on
+   the container via :focus-within rather than on the thumb. */
 .time-scrubber {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
+  margin: 0;
   background: transparent;
-  cursor: pointer;
+  cursor: ew-resize;
 }
 
 .time-scrubber:focus {
@@ -41,41 +43,29 @@ body {
 }
 
 .time-scrubber::-webkit-slider-runnable-track {
-  height: 2.25rem;
+  height: 100%;
   background: transparent;
 }
 
 .time-scrubber::-moz-range-track {
-  height: 2.25rem;
+  height: 100%;
   background: transparent;
 }
 
 .time-scrubber::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 0.5rem;
-  height: 2.25rem;
-  border-radius: 0.25rem;
-  background: var(--color-ink);
-  border: 2px solid var(--color-ground);
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.5);
+  width: 24px;
+  height: 100%;
+  background: transparent;
+  border: 0;
 }
 
 .time-scrubber::-moz-range-thumb {
-  width: 0.5rem;
-  height: 2.25rem;
-  border-radius: 0.25rem;
-  background: var(--color-ink);
-  border: 2px solid var(--color-ground);
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.5);
-}
-
-.time-scrubber:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 2px var(--color-score-good);
-}
-
-.time-scrubber:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 2px var(--color-score-good);
+  width: 24px;
+  height: 100%;
+  background: transparent;
+  border: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

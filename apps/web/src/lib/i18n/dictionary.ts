@@ -63,6 +63,9 @@ export interface Dictionary {
     whyTitle: string;
     activeVetoes: string;
     marineCaveat: string;
+    lowersScore: string;
+    raisesScore: string;
+    factorOwnRating: string;
   };
   /** Templates for FactorScore.noteKey — apps/web/src/lib/i18n/renderFactorNote.ts
    * interpolates {param} placeholders. Never rendered from FactorScore.note
@@ -386,6 +389,9 @@ export const dictionaries: Record<Locale, Dictionary> = {
         excellent: "Excellent",
       },
       whyTitle: "Why this score?",
+      lowersScore: "lowers the score",
+      raisesScore: "raises the score",
+      factorOwnRating: "This factor's own rating out of 100, before how much it counts today.",
       activeVetoes: "Active safety warnings",
       marineCaveat: "No marine data near this point — scoring from wind, pressure and sky alone.",
     },
@@ -781,6 +787,9 @@ export const dictionaries: Record<Locale, Dictionary> = {
         excellent: "Εξαιρετική",
       },
       whyTitle: "Γιατί αυτή η βαθμολογία;",
+      lowersScore: "ρίχνει τη βαθμολογία",
+      raisesScore: "ανεβάζει τη βαθμολογία",
+      factorOwnRating: "Η βαθμολογία αυτού του παράγοντα στα 100, πριν από το πόσο μετράει σήμερα.",
       activeVetoes: "Ενεργές προειδοποιήσεις ασφαλείας",
       marineCaveat: "Δεν υπάρχουν θαλάσσια δεδομένα κοντά σε αυτό το σημείο — βαθμολόγηση μόνο από άνεμο, πίεση και ουρανό.",
     },

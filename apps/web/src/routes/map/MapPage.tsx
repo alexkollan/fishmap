@@ -62,25 +62,46 @@ export function MapPage() {
       <div className="relative flex-1">
         <MapCanvas center={location} onReady={handleReady} onTap={handleTap} />
 
-        <div className="absolute left-3 top-3 z-10 flex flex-col items-start gap-2">
+        <div className="absolute left-3 top-3 z-10">
           <ModeSwitch />
+        </div>
+
+        {/* Right stack sits below MapLibre's own zoom control (top-right,
+            ~3.5rem tall) and clear of the mode switch, which runs nearly the
+            full width at phone sizes. Icon-only for the same reason — the
+            text labels used to collide with both. */}
+        <div className="absolute right-3 top-16 z-10 flex flex-col items-end gap-2">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen((v) => !v)}
+            title={t.map.layers}
+            aria-label={t.map.layers}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-ground-raised/90 text-ink shadow-lg backdrop-blur hover:bg-white/10"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <path d="M12 3 3 8l9 5 9-5-9-5Z" strokeLinejoin="round" />
+              <path d="m3 13 9 5 9-5" strokeLinejoin="round" />
+            </svg>
+          </button>
           <button
             type="button"
             onClick={() => void locate()}
             disabled={locating}
-            className="rounded-md border border-white/10 bg-ground-raised px-3 py-2 text-sm text-ink shadow hover:bg-white/5 disabled:opacity-60"
+            title={t.location.useMyLocation}
+            aria-label={t.location.useMyLocation}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-ground-raised/90 text-ink shadow-lg backdrop-blur hover:bg-white/10 disabled:opacity-60"
           >
-            {locating ? t.location.locating : t.location.useMyLocation}
-          </button>
-        </div>
-
-        <div className="absolute right-3 top-3 z-10 flex flex-col items-end gap-2">
-          <button
-            type="button"
-            onClick={() => setDrawerOpen((v) => !v)}
-            className="rounded-md border border-white/10 bg-ground-raised px-3 py-2 text-sm text-ink shadow hover:bg-white/5"
-          >
-            {t.map.layers}
+            <svg
+              viewBox="0 0 24 24"
+              className={`h-5 w-5 ${locating ? "animate-pulse" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="3.5" />
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" strokeLinecap="round" />
+            </svg>
           </button>
         </div>
 

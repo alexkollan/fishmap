@@ -10,6 +10,23 @@ Purpose: let any Claude Code session (or human) pick up this project cold and kn
 
 ---
 
+## Map UI legibility pass — and the first real browser verification (2026-09-17)
+
+User feedback on the previous day's work, three complaints, all valid:
+
+1. **The timeline didn't look like the rest of the app.** Rebuilt as an SVG strip in a `rounded-xl` bordered container matching the app's surface treatment, with a proper playhead, day separators and weekday labels. The native range input is now an invisible interaction layer over it (24px thumb for touch, focus shown on the container via `:focus-within`).
+2. **The timeline's colours were indistinguishable.** They were: the first version painted a *continuous* red→yellow→green ramp, and since real Greek scores cluster in 45–75, a week rendered as one flat yellow-green smear. Worse, it was drawn at `opacity: 0.5` over the near-black ground, which turned orange into brown and yellow into olive. Fixed with **discrete band fills** (new `scoreBandColor`, the same five steps the app already names in words) at **full opacity**, plus a dark score polyline over the top for the detail banding throws away. Verified against a real forecast, not just reasoned about.
+3. **Nobody could read the factor bars.** The old bar multiplied score and weight into one left-anchored length while colour separately encoded the score, so a long green bar and a long red bar both meant "this mattered a lot", in opposite directions, with no marked neutral point — hence the reported "what does a full green bar mean vs. half a green one". **Now the bar diverges from a centre axis: left = pulled the score down, right = pushed it up**, length = how much. Direction is positional, so colour only has to say up-or-down (two colours, no ramp). The factor's own 0–100 rating moved to its own band-coloured number beside the bar, because "how good is this factor" and "how much did it move today's total" are genuinely different questions — a factor can rate 90 and barely register if conditions demoted its weight. Added an axis legend and reworded the Today caption.
+
+**Two real bugs found by finally looking at it:**
+
+- **The map pin never appeared on arrival.** `MapCanvas`'s marker effect ran before the style's `load` fired, bailed on a null map ref, and had no reason to re-run because `center` hadn't changed since. The marker only ever showed up if you moved the pin yourself — fine when the map was a secondary route, fatal now that it's the landing page and the pin is the point. Fixed by tracking readiness in state so the effect re-runs on load.
+- **The map controls overlapped.** The Layers button sat under MapLibre's own zoom control and collided with the mode switch, which runs nearly the full width at phone sizes. Both custom buttons are now icon-only in a right-hand stack below the zoom control.
+
+**Verified in a real browser this time.** Playwright's Chromium was already cached on this machine, so the "no browser automation available" caveat from 2026-09-16 no longer applied. Screenshotted at 390×844 and 1280×800, in Greek: landing state, mid-scrub state (playhead moves, "back to now" appears, score and factor ranking update for the scrubbed hour), the expanded breakdown, `/today`, and the `/map`→`/` redirect preserving its query string. No console or page errors.
+
+**Process note worth remembering:** `pnpm dev:web` served a *stale bundle* throughout — confirmed by `curl`ing the module from the dev server and grepping for a symbol that was definitely on disk. Restarting it did not help. This is the DrvFs/chokidar failure CLAUDE.md already warns about, and it cost two rounds of screenshots that showed old code. The fix that worked: `pnpm build` plus a small static server proxying `/api` to 3001. **For visual verification on this machine, build and serve `dist/` — do not trust the dev server.**
+
 ## Map is the homepage, with a Windy-style score time scrubber (2026-09-16)
 
 **Pushed to `origin/main` 2026-09-16** — this entry, the contextual-weights entry below, and `FEATURE_SCORE_HEATMAP.md` are all live on the remote (`0ecfbb0`, `0ac1c68`, `d7ede9f`). Note that means the **unverified-in-a-browser** caveat at the end of this entry is now on main, not sitting in a local branch: the browser check is still outstanding, and this is the first deploy where the landing route, the auto-locate path and the scrubber reach real visitors.
