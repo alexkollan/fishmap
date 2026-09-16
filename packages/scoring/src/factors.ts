@@ -155,12 +155,22 @@ function windShoreAngle(windFromDeg: number, aspectDeg: number): number {
   return 180 - diff;
 }
 
-type ShoreRelation = "onshore" | "cross" | "offshore";
+export type ShoreRelation = "onshore" | "cross" | "offshore";
 
 function classifyRelation(angle: number): ShoreRelation {
   if (angle <= 45) return "onshore";
   if (angle >= 135) return "offshore";
   return "cross";
+}
+
+/** The wind's relation to this spot's coastline, or undefined when either
+ * the segment aspect or the wind direction is missing (the normal case
+ * today — see the aspectDeg note above). Exported for modulation.ts, which
+ * treats onshore churn as cover on the water and offshore flattening as the
+ * opposite. */
+export function shoreWindRelation(wx: WeatherHour, aspectDeg?: number): ShoreRelation | undefined {
+  if (aspectDeg === undefined || wx.windDirection10m === undefined) return undefined;
+  return classifyRelation(windShoreAngle(wx.windDirection10m, aspectDeg));
 }
 
 // DEV_PLAN.md §4.2: onshore 8-20 km/h is the best case, offshore flattens
@@ -285,23 +295,36 @@ export function waveConditions(wx: WeatherHour, mode: Mode): RawFactor {
 // No river-mouth distance or substrate yet (segment-level, Phase 4) —
 // modelled from wave height/period and 24h rainfall only.
 
-function sumPrecip(hourly: WeatherHour[], index: number, hours: number): number {
+export function sumPrecip(hourly: WeatherHour[], index: number, hours: number): number {
   let sum = 0;
   for (let i = Math.max(0, index - hours); i < index; i++) sum += hourly[i]?.precipitation ?? 0;
   return sum;
+}
+
+/** Wave steepness (height/period) as a 0-1 "surface is broken up" index —
+ * the same quantity that drives turbidity, also reused by modulation.ts as
+ * one of the things that puts cover on the water. */
+export function chopIndex(wx: WeatherHour): number | undefined {
+  if (wx.waveHeight === undefined || wx.wavePeriod === undefined) return undefined;
+  return clamp((wx.waveHeight / (wx.wavePeriod || 1)) * 3, 0, 1);
+}
+
+/** Modelled water turbidity, 0 (gin clear) to 1 (chocolate milk). Exported
+ * so modulation.ts weights factors off exactly the same number the
+ * turbidity factor grades, rather than a second approximation of it. */
+export function turbidityIndex(hourly: WeatherHour[], index: number): number {
+  const wx = hourly[index];
+  if (!wx) return 0;
+  const waveComponent = chopIndex(wx) ?? 0;
+  const rainComponent = clamp(sumPrecip(hourly, index, 24) / 20, 0, 1);
+  return clamp(waveComponent * 0.6 + rainComponent * 0.4, 0, 1);
 }
 
 export function turbidity(hourly: WeatherHour[], index: number, mode: Mode): RawFactor {
   const wx = hourly[index];
   if (!wx) return factor("turbidity", 42, "No data available.", "turbidity.noData");
 
-  const waveComponent =
-    wx.waveHeight !== undefined && wx.wavePeriod !== undefined
-      ? clamp((wx.waveHeight / (wx.wavePeriod || 1)) * 3, 0, 1)
-      : 0;
-  const precip24h = sumPrecip(hourly, index, 24);
-  const rainComponent = clamp(precip24h / 20, 0, 1);
-  const turbid = clamp(waveComponent * 0.6 + rainComponent * 0.4, 0, 1);
+  const turbid = turbidityIndex(hourly, index);
 
   // Same input, opposite sign by mode (§4.4): murky is cover for shore/boat
   // predator fishing, catastrophic for spearfishing visibility. Recalibrated
@@ -432,6 +455,40 @@ function timeOfDayBase(
   return { score, noteKey: "light.daytime", isLowLightAlready: false };
 }
 
+/** Fraction of top-of-atmosphere sunlight actually reaching the surface,
+ * 0-1 — roughly 0.7 under clear Greek sky, 0.15-0.3 under a heavy deck.
+ * Undefined at night (both irradiances are 0) and when the radiation
+ * variables are missing, in which case callers fall back to cloud cover.
+ *
+ * Preferred over `cloudCover` wherever it's available: cloud cover is a
+ * sky-area percentage that says nothing about how *opaque* the cloud is or
+ * how high the sun was behind it, and thin 100% cirrus at noon passes far
+ * more light to the water than a 70% storm deck. */
+export function atmosphericTransmission(wx: WeatherHour): number | undefined {
+  const sw = wx.shortwaveRadiation;
+  const toa = wx.terrestrialRadiation;
+  if (sw === undefined || toa === undefined || toa < 20) return undefined;
+  return clamp(sw / toa, 0, 1);
+}
+
+/** 0 (blazing clear midday) to 1 (no usable light gradient at all) — how
+ * much the sun is being kept off/out of the water right now. Combines
+ * atmospheric attenuation with surface chop scatter; shared by the light
+ * factor's score adjustment and by modulation.ts's light weighting so the
+ * two can't disagree about how bright the day is. */
+export function lightAttenuation(wx: WeatherHour): number | undefined {
+  const transmission = atmosphericTransmission(wx);
+  const atmos =
+    transmission !== undefined
+      ? clamp((0.75 - transmission) / 0.6, 0, 1)
+      : wx.cloudCover !== undefined
+        ? clamp(wx.cloudCover / 100, 0, 1)
+        : undefined;
+  if (atmos === undefined) return undefined;
+  const chop = chopIndex(wx) ?? 0;
+  return clamp(atmos * 0.82 + chop * 0.18, 0, 1);
+}
+
 export function lightWindow(wx: WeatherHour, sun: SunTimes, mode: Mode): RawFactor {
   const tMs = Date.parse(wx.time);
   const { score: base, noteKey: baseKey, isLowLightAlready } = timeOfDayBase(tMs, sun, wx.isDay, mode);
@@ -439,16 +496,26 @@ export function lightWindow(wx: WeatherHour, sun: SunTimes, mode: Mode): RawFact
   let score = base;
   let noteKey = baseKey;
   let note = baseKey.replace("light.", "");
-  if (wx.cloudCover !== undefined && mode !== "spearfishing") {
-    const multiplier = isLowLightAlready
-      ? 1 + clamp(wx.cloudCover / 100, 0, 1) * 0.08
-      : wx.cloudCover >= 60
-        ? 1.6
-        : wx.cloudCover >= 20
-          ? 1.2
-          : 1;
+
+  // Reworked 2026-09-16: was a stepped cloud-cover multiplier topping out at
+  // 1.6. Two changes. (1) Continuous, off measured attenuation rather than
+  // three cloud-cover buckets, so a marginal cloud deck no longer flips the
+  // score by 40% at exactly 60%. (2) Capped lower (1.35), because the score
+  // is now only carrying half this job — modulation.ts separately *drops
+  // light's weight* under cover. Those are two genuinely different claims:
+  // overcast midday really is better light for fishing than clear midday
+  // (score), and the whole time-of-day signal is less decisive on a flat
+  // grey day (weight). Both at full strength would double-count.
+  const attenuation = lightAttenuation(wx);
+  if (attenuation !== undefined && mode !== "spearfishing") {
+    const multiplier = isLowLightAlready ? 1 + attenuation * 0.08 : interpolateCurve(attenuation, [
+      [0, 1],
+      [0.25, 1.05],
+      [0.6, 1.25],
+      [1, 1.35],
+    ]);
     score = base * multiplier;
-    if (wx.cloudCover >= 60 && !isLowLightAlready) {
+    if (attenuation >= 0.55 && !isLowLightAlready) {
       noteKey = "light.daytimeOvercast";
       note = "Heavy overcast is extending the low-light advantage across the day.";
     }

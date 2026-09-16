@@ -28,6 +28,15 @@ const FORECAST_HOURLY = [
   "relative_humidity_2m",
   "is_day",
   "weather_code",
+  // Added 2026-09-16 for contextual weight modulation (packages/scoring/src/
+  // modulation.ts). Their ratio is atmospheric transmission, which is what
+  // actually decides how much the time-of-day signal matters — cloud_cover %
+  // says nothing about sun angle, and a thin 100% cirrus deck and a black
+  // storm deck are both "100". Single-point only, deliberately not added to
+  // AREA_*_HOURLY below: 2 extra variables is nothing against a 60min/3h
+  // cached per-spot request, but the area grid multiplies by 352 locations.
+  "shortwave_radiation",
+  "terrestrial_radiation",
 ].join(",");
 
 const MARINE_HOURLY = [

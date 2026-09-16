@@ -16,8 +16,21 @@ export {
   currentFactor,
   seasonality,
   describeMoonPhase,
+  atmosphericTransmission,
+  lightAttenuation,
+  turbidityIndex,
+  chopIndex,
+  shoreWindRelation,
   type RawFactor,
+  type ShoreRelation,
 } from "./factors.js";
-export { checkVetoes } from "./vetoes.js";
+export { checkVetoes, VETO_LIMITS } from "./vetoes.js";
 export { DEFAULT_WEIGHT_PROFILES } from "./weights.js";
+export {
+  deriveContext,
+  buildWeightModifiers,
+  noDataModifier,
+  effectiveWeight,
+  type ScoringContext,
+} from "./modulation.js";
 export { scoreHour } from "./score.js";

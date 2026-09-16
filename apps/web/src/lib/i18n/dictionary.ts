@@ -84,6 +84,33 @@ export interface Dictionary {
     current: { noData: string; spear: string; speedOnly: string; onshore: string; offshore: string; cross: string; slack: string };
     seasonality: { value: string };
   };
+  /** Templates for WeightModifier.reasonKey — why a factor counted for more
+   * or less than its usual share this hour (packages/scoring/src/modulation.ts). */
+  weightReasons: {
+    lightMutedByCover: string;
+    lightSharpenedByGlare: string;
+    lightCriticalForDiver: string;
+    lightAmpleForDiver: string;
+    pressureFrontConfirmed: string;
+    pressureFrontActive: string;
+    pressureAirmassShift: string;
+    pressureStagnant: string;
+    solunarNightMoon: string;
+    turbidityLessAtNight: string;
+    precipActive: string;
+    precipQuiet: string;
+    seaTempShifting: string;
+    seaTempExtreme: string;
+    seaTempFlat: string;
+    windDirectionResolved: string;
+    currentDirectionResolved: string;
+    windNearLimit: string;
+    wavesNearLimit: string;
+    factorNoData: string;
+    /** Short badge next to a reweighted factor, e.g. "counts more". */
+    countsMore: string;
+    countsLess: string;
+  };
   /** Templates for VetoInfo.key. */
   vetoes: {
     thunderstorm: string;
@@ -433,6 +460,31 @@ export const dictionaries: Record<Locale, Dictionary> = {
         value: "{month} — general Greek coastal fishery activity.",
       },
     },
+    weightReasons: {
+      lightMutedByCover:
+        "Cloud and chop are keeping the sun off the water, so the time of day decides less than usual today.",
+      lightSharpenedByGlare: "Bright sun over clear, flat water — the time of day counts for more than usual.",
+      lightCriticalForDiver: "Low light and murk make visibility the deciding factor for a diver right now.",
+      lightAmpleForDiver: "Plenty of light and clear water — visibility isn't the constraint today.",
+      pressureFrontConfirmed: "The barometer is moving and the air has cooled — a real front, so pressure carries more weight.",
+      pressureFrontActive: "The barometer is genuinely moving, so pressure carries more weight than usual.",
+      pressureAirmassShift: "The air mass has changed overnight — pressure is worth more attention than usual.",
+      pressureStagnant: "A flat barometer tells us very little, so pressure counts for less than usual today.",
+      solunarNightMoon: "After dark the moon is the actual light source, so it counts for more than it does by day.",
+      turbidityLessAtNight: "Fish hunt by scent and vibration after dark, so water clarity matters less.",
+      precipActive: "Rain is actually falling, so it counts for more than its usual share.",
+      precipQuiet: "Dry, as it nearly always is — precipitation tells us little today.",
+      seaTempShifting: "The sea temperature is genuinely moving, so it counts for more than usual.",
+      seaTempExtreme: "The sea is outside the comfortable band, so its temperature counts for more than usual.",
+      seaTempFlat: "Sea temperature is steady and unremarkable, so it counts for less than usual.",
+      windDirectionResolved: "We know this spot's wind direction relative to the shore, making wind a sharper signal.",
+      currentDirectionResolved: "We know which way the current runs relative to the shore, making it a sharper signal.",
+      windNearLimit: "At {speed} km/h the wind is close to the safety limit — it dominates the score from here.",
+      wavesNearLimit: "At {wave} m the sea is close to the safety limit — it dominates the score from here.",
+      factorNoData: "No data for this factor here, so it barely counts toward the score.",
+      countsMore: "counts more",
+      countsLess: "counts less",
+    },
     vetoes: {
       thunderstorm: "Thunderstorm risk — lightning and open water/carbon rods don't mix. This veto cannot be overridden.",
       wind: {
@@ -451,7 +503,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
       seeForecast: "See 7-day forecast",
       sunMoonStrip: "Sun & moon",
       topFactors: "What's driving this",
-      topFactorsCaption: "Every factor below is computed for every fishing mode — only the weight changes.",
+      topFactorsCaption:
+        "Every factor is computed for every fishing mode. How much each one counts shifts with the conditions — a flat barometer or an overcast midday tells you less, so it decides less.",
       showAllFactors: "Show all {count} factors",
       showFewerFactors: "Show fewer",
     },
@@ -609,7 +662,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
       },
       weights: {
         title: "Live scoring weights",
-        description: "Per-mode factor weights. Changes apply immediately to every page and the map.",
+        description:
+          "Baseline per-mode factor weights. Scoring adjusts these live against the conditions of each hour, so what you set here is the starting point, not the final say. Changes apply immediately to every page and the map.",
         reset: "Reset to defaults",
         overridden: "Overridden",
         defaultLabel: "Default",
@@ -795,6 +849,31 @@ export const dictionaries: Record<Locale, Dictionary> = {
         value: "{month} — γενική δραστηριότητα ελληνικής παράκτιας αλιείας.",
       },
     },
+    weightReasons: {
+      lightMutedByCover:
+        "Τα σύννεφα και ο κυματισμός κρατούν τον ήλιο μακριά από το νερό, οπότε η ώρα της ημέρας μετράει λιγότερο σήμερα.",
+      lightSharpenedByGlare: "Δυνατός ήλιος πάνω από καθαρό, επίπεδο νερό — η ώρα της ημέρας μετράει περισσότερο.",
+      lightCriticalForDiver: "Λίγο φως και θολό νερό: η ορατότητα είναι ο καθοριστικός παράγοντας για τον δύτη τώρα.",
+      lightAmpleForDiver: "Άφθονο φως και καθαρό νερό — η ορατότητα δεν είναι ο περιοριστικός παράγοντας σήμερα.",
+      pressureFrontConfirmed: "Το βαρόμετρο κινείται και ο αέρας κρύωσε — πραγματικό μέτωπο, άρα η πίεση βαραίνει περισσότερο.",
+      pressureFrontActive: "Το βαρόμετρο κινείται ουσιαστικά, οπότε η πίεση βαραίνει περισσότερο από ό,τι συνήθως.",
+      pressureAirmassShift: "Η αέρια μάζα άλλαξε μέσα στο 24ωρο — η πίεση αξίζει περισσότερη προσοχή από ό,τι συνήθως.",
+      pressureStagnant: "Ένα στάσιμο βαρόμετρο δεν μας λέει πολλά, οπότε η πίεση μετράει λιγότερο σήμερα.",
+      solunarNightMoon: "Μετά το σκοτάδι η σελήνη είναι η πραγματική πηγή φωτός, οπότε μετράει περισσότερο απ' ό,τι την ημέρα.",
+      turbidityLessAtNight: "Τα ψάρια κυνηγούν με όσφρηση και δονήσεις στο σκοτάδι, οπότε η διαύγεια του νερού μετράει λιγότερο.",
+      precipActive: "Βρέχει πραγματικά, οπότε η βροχόπτωση μετράει περισσότερο από το συνηθισμένο μερίδιό της.",
+      precipQuiet: "Στεγνά, όπως σχεδόν πάντα — η βροχόπτωση δεν μας λέει κάτι σήμερα.",
+      seaTempShifting: "Η θερμοκρασία της θάλασσας μεταβάλλεται ουσιαστικά, οπότε μετράει περισσότερο από ό,τι συνήθως.",
+      seaTempExtreme: "Η θάλασσα είναι εκτός της άνετης ζώνης, οπότε η θερμοκρασία της μετράει περισσότερο από ό,τι συνήθως.",
+      seaTempFlat: "Η θερμοκρασία της θάλασσας είναι σταθερή και αδιάφορη, οπότε μετράει λιγότερο από ό,τι συνήθως.",
+      windDirectionResolved: "Γνωρίζουμε την κατεύθυνση του ανέμου ως προς την ακτή εδώ, κάνοντας τον άνεμο πιο καθαρό σήμα.",
+      currentDirectionResolved: "Γνωρίζουμε προς τα πού τρέχει το ρεύμα ως προς την ακτή, κάνοντάς το πιο καθαρό σήμα.",
+      windNearLimit: "Στα {speed} χλμ/ώ ο άνεμος πλησιάζει το όριο ασφαλείας — από εδώ και πέρα κυριαρχεί στη βαθμολογία.",
+      wavesNearLimit: "Στα {wave} μ η θάλασσα πλησιάζει το όριο ασφαλείας — από εδώ και πέρα κυριαρχεί στη βαθμολογία.",
+      factorNoData: "Δεν υπάρχουν δεδομένα για αυτόν τον παράγοντα εδώ, οπότε ελάχιστα μετράει στη βαθμολογία.",
+      countsMore: "μετράει περισσότερο",
+      countsLess: "μετράει λιγότερο",
+    },
     vetoes: {
       thunderstorm: "Κίνδυνος καταιγίδας — αστραπές και ανοιχτό νερό/καλάμια δεν συνδυάζονται. Αυτό το βέτο δεν παρακάμπτεται.",
       wind: {
@@ -813,7 +892,9 @@ export const dictionaries: Record<Locale, Dictionary> = {
       seeForecast: "Δείτε την πρόγνωση 7 ημερών",
       sunMoonStrip: "Ήλιος & Σελήνη",
       topFactors: "Τι καθορίζει τη βαθμολογία",
-      topFactorsCaption: "Κάθε παράγοντας παρακάτω υπολογίζεται για κάθε τρόπο ψαρέματος — αλλάζει μόνο η βαρύτητά του.",
+      topFactorsCaption:
+        "Κάθε παράγοντας υπολογίζεται για κάθε τρόπο ψαρέματος. Το πόσο μετράει ο καθένας αλλάζει ανάλογα με τις συνθήκες — ένα στάσιμο βαρόμετρο ή ένα συννεφιασμένο μεσημέρι λένε λιγότερα, άρα κρίνουν λιγότερο."
+        ,
       showAllFactors: "Εμφάνιση και των {count} παραγόντων",
       showFewerFactors: "Λιγότερα",
     },
@@ -971,7 +1052,8 @@ export const dictionaries: Record<Locale, Dictionary> = {
       },
       weights: {
         title: "Ζωντανές βαρύτητες βαθμολόγησης",
-        description: "Βαρύτητες παραγόντων ανά τρόπο ψαρέματος. Οι αλλαγές εφαρμόζονται άμεσα σε κάθε σελίδα και στον χάρτη.",
+        description:
+          "Βασικές βαρύτητες παραγόντων ανά τρόπο ψαρέματος. Η βαθμολόγηση τις προσαρμόζει ζωντανά στις συνθήκες κάθε ώρας, οπότε ό,τι ορίζετε εδώ είναι η αφετηρία, όχι ο τελικός λόγος. Οι αλλαγές εφαρμόζονται άμεσα σε κάθε σελίδα και στον χάρτη.",
         reset: "Επαναφορά προεπιλογών",
         overridden: "Παρακαμφθέν",
         defaultLabel: "Προεπιλογή",

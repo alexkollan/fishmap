@@ -10,6 +10,37 @@ Purpose: let any Claude Code session (or human) pick up this project cold and kn
 
 ---
 
+## Weights are now contextual, not static per mode (2026-09-16)
+
+User's push: static per-mode weights aren't realistic. Their worked example — midday is a hard negative for shore fishing, but put clouds over it and the time of day "plays a significantly lower role," because less light means fish don't retreat deep at 13:00. Generalised: **a factor's weight should track how much information it's currently carrying, and that's a function of the other factors.**
+
+The old code half-agreed and picked the wrong lever: `lightWindow()` multiplied light's *score* by up to 1.6× under ≥60% cloud. That asserts pitch-dark-at-noon is *good light*, rather than that light stopped being the deciding variable. Score answers "how good is this condition"; weight answers "how much should it decide the number." Cloud moves both, mostly the second.
+
+**New `packages/scoring/src/modulation.ts`.** Base weights (weights.ts, still admin-editable) × contextual multipliers = effective weight. Eight rules, each mechanistic and each emitting a translated `reasonKey` so the UI can explain the shift — an adaptive weighting nobody can interrogate would be worse than the static one it replaced:
+
+1. **Light vs. cover** (the headline rule). Cloud + chop + turbidity → a cover index; light's weight ranges ×1.15 (hard sun, glassy clear water — the diel cycle at its sharpest) down to ×0.5 (heavy deck). Onshore wind nudges cover up, offshore down (dormant, needs `aspectDeg`). Skipped at night — no sunlight to attenuate. **Inverted for spearfishing**: a diver's "light" factor is about whether they can see at all, so gloom makes it *more* decisive, compounding with turbidity rather than being softened by it.
+2. **Pressure signal**. Pressure is top-weighted on tagging studies that found pressure *change* predictive, not a barometer reading. A flat 1015 hPa week is the absence of a signal, so ×0.55; genuinely moving ×1.35; moving *and* confirmed by a 24h air-temp drop ×1.5.
+3. **Night**. Moon illumination stops being contested solunar astrology and becomes photometry after dark → solunar ×1.15–1.45. Turbidity ×0.75 (fish hunt by lateral line/scent in the dark).
+4. **No-data** ×0.15. Previously a point with no marine coverage injected three neutral-42 placeholders at full weight, dragging every such score toward a flat mid-40s. Not zeroed, so the factor still shows in the breakdown with its explanation.
+5. **Precipitation** ×0.5 when dry (its value nearly every Greek hour — a variable pinned at neutral shouldn't hold a fixed 5%), ×1.3 when actually raining.
+6. **Sea temp** ×1.3 on a real 48h delta, ×1.2 when outside 15–26°C, else ×0.7 (the absolute-value fallback curve spans ~20 points across the whole realistic Aegean range).
+7. **Direction resolved** (dormant, needs `aspectDeg`): wind ×1.2, current ×1.15 — a known shore-relative direction is a sharper claim than a speed averaged over unknown direction.
+8. **Near safety limit** ×1.35. A 43 km/h shore wind is one gust short of the veto; at an ordinary 15% share a good dawn could still drag the composite into "Fair", which is exactly the hour nobody should be on wet rocks. Covers the approach; above the limit the veto already clamps.
+
+Guardrails: per-modifier clamp [0.15, 2], per-factor product cap [0.12, 2.5], and `weightedAverage()` falls back to base weights if modulation ever zeroes the divisor (a 0 score reads as "terrible conditions", the worst possible failure mode).
+
+**New API data.** Added `shortwave_radiation` + `terrestrial_radiation` to the single-point forecast fetch; their ratio is atmospheric transmission. This replaced cloud cover as the light input and it matters more than expected — live-checked against a real Aegean point, cloud cover sat pinned at 96–100% for six straight hours (completely undiscriminating) while transmission moved 0.24 → 0.44. Thin 100% cirrus and a black storm deck are both "100". Deliberately *not* added to the batch/area fetchers (2 extra variables is nothing on a 60min/3h-cached per-spot request; it's 352× on the grid). Falls back to cloud cover when absent, so already-cached rows keep scoring fine until their TTL expires — no migration needed.
+
+Also: `lightWindow()`'s score multiplier is now continuous off measured attenuation instead of three cloud-cover buckets (no more 40% score flip at exactly 60% cloud) and capped at 1.35, since the weight layer now carries half that job.
+
+**Types**: `FactorScore` gained `baseWeight` + `modifiers`; `weight` is now the *effective* weight, so everything already ranking by `.weight` (`FactorBreakdown`, `TodayPage`, `useBestWindows`) picked up dynamic weighting with no change. `ScoreResult.modifiers` is the flattened list. `FactorBreakdown` shows a "counts more/less" badge plus the plain-language reason. 20 new `weightReasons` keys, en + el.
+
+**Verified**: `pnpm typecheck`, `pnpm build`, `pnpm test` (scoring 18 tests incl. 14 new in `modulation.test.ts`, api 2) green — `apps/web`'s "no test files" failure is pre-existing. Live end-to-end through `pnpm dev:api` against Open-Meteo: both radiation fields present on all 216 hours, and scoring the same 11:00 hour on two consecutive real days gave 100% cloud → light 20→17.4 (`lightMutedByCover`), 0% cloud → light 20→22 (`lightSharpenedByGlare`). Dev API stopped afterwards.
+
+**Not verified**: nothing rendered in a real browser — the `FactorBreakdown` badge/reason line is typechecked and built but not eyeballed. Worth a look on `/today`, where several factors can be modulated at once and the reason lines could crowd the list.
+
+**Open item**: base weights in `weights.ts` were tuned against *static* weighting. Now that a flat barometer self-demotes and a dry hour self-demotes, the defaults are arguably mis-tuned in the other direction (pressure's 24 was set partly to compensate for the days it says nothing). Worth re-reviewing the baselines against real outings before treating them as settled.
+
 ## Windy layer un-gated — made public, not behind `windParticles` (2026-08-30)
 
 Follow-up to the entry below, same day. Shipped the wind/current/pressure layer behind the pre-existing `windParticles` admin-only flag, matching that flag's original seed intent (DEV_PLAN.md §6.4/§8: "prove frame cost before wider rollout"). User tried it on the deployed site, hit the admin login wall, and pointed out directly they'd never set a production admin password and didn't want one required for a decorative map layer.

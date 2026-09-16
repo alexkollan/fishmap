@@ -40,6 +40,8 @@ export function mergeToSeries(
       relativeHumidity2m: at(f.relative_humidity_2m, i),
       isDay: at(f.is_day, i) as 0 | 1 | undefined,
       weatherCode: at(f.weather_code, i),
+      shortwaveRadiation: at(f.shortwave_radiation, i),
+      terrestrialRadiation: at(f.terrestrial_radiation, i),
     };
 
     const mi = m ? marineIndexByTime.get(time) : undefined;

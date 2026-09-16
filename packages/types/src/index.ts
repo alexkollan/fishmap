@@ -9,10 +9,33 @@ export interface ActiveLocation extends Coordinates {
   name: string;
 }
 
+/** One contextual adjustment to a factor's weight (packages/scoring/src/
+ * modulation.ts). Weights are no longer static per mode: how much a factor
+ * *should* count depends on whether it's currently carrying information.
+ * Emitted so the UI can explain why today weighted things differently. */
+export interface WeightModifier {
+  /** FactorScore.key this adjusts. */
+  factorKey: string;
+  /** Multiplier applied to the base weight. >1 = matters more than usual. */
+  multiplier: number;
+  /** Translation key into Dictionary.weightReasons, e.g. "lightMutedByCover". */
+  reasonKey: string;
+  params?: Record<string, number | string>;
+}
+
 export interface FactorScore {
   key: string;
   score: number;
+  /** Effective weight actually used in the composite — `baseWeight` after
+   * every applicable WeightModifier. Anything ranking or rendering factor
+   * contributions should use this, not `baseWeight`. */
   weight: number;
+  /** The mode's static weight from the active WeightProfile, before
+   * contextual modulation. Shown in the UI only to explain a shift. */
+  baseWeight: number;
+  /** Adjustments that took `baseWeight` to `weight`; empty when conditions
+   * gave this factor its ordinary say. */
+  modifiers: WeightModifier[];
   /** English fallback — used server-side (logs, notification bodies) where
    * there's no i18n layer. UI must render via `noteKey`/`noteParams`
    * instead (apps/web/src/lib/i18n/renderFactorNote.ts) so Greek users
@@ -39,6 +62,10 @@ export interface ScoreResult {
   vetoes: VetoInfo[];
   factors: FactorScore[];
   caveats: string[];
+  /** Every WeightModifier that fired this hour, flattened across factors —
+   * the "how today's weighting shifted" summary. Per-factor copies also
+   * live on each FactorScore.modifiers. */
+  modifiers: WeightModifier[];
 }
 
 export interface WeightProfile {
@@ -66,6 +93,13 @@ export interface WeatherHour {
   relativeHumidity2m?: number; // %
   isDay?: 0 | 1;
   weatherCode?: number;
+  /** Solar irradiance actually reaching the surface, W/m². */
+  shortwaveRadiation?: number;
+  /** Top-of-atmosphere irradiance for this hour/latitude, W/m². Only useful
+   * as the denominator for `shortwaveRadiation` — the ratio is atmospheric
+   * transmission (~0.7 clear sky, ~0.2 heavy overcast), which unlike raw
+   * cloud cover % is already normalised for sun angle and season. */
+  terrestrialRadiation?: number;
 
   waveHeight?: number; // m
   waveDirection?: number; // deg

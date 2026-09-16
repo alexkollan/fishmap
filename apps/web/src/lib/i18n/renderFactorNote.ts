@@ -1,4 +1,4 @@
-import type { FactorScore, VetoInfo } from "@fishmap/types";
+import type { FactorScore, VetoInfo, WeightModifier } from "@fishmap/types";
 import type { Dictionary } from "./dictionary";
 
 function getTemplate(root: unknown, dottedKey: string): string | undefined {
@@ -35,6 +35,22 @@ export function renderFactorNote(t: Dictionary, f: Pick<FactorScore, "note" | "n
     else if (key === "monthKey") values.month = t.common.months[Number(value)] ?? String(value);
     else if (typeof value === "number") values[key] = formatParam(key, value);
     else values[key] = String(value);
+  }
+  return interpolate(template, values);
+}
+
+/** WeightModifier counterpart to renderFactorNote — the plain-language
+ * reason a factor counted for more or less than its usual share this hour.
+ * Returns undefined rather than an English fallback when the key is missing,
+ * since this is supplementary explanation and a blank is better than a
+ * stray untranslated sentence. */
+export function renderWeightReason(t: Dictionary, m: WeightModifier): string | undefined {
+  const template = (t.weightReasons as Record<string, string>)[m.reasonKey];
+  if (!template) return undefined;
+
+  const values: Record<string, string> = {};
+  for (const [key, value] of Object.entries(m.params ?? {})) {
+    values[key] = typeof value === "number" ? formatParam(key, value) : String(value);
   }
   return interpolate(template, values);
 }
