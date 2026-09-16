@@ -26,13 +26,14 @@ const useOverlayStore = create<OverlayStore>()(
   ),
 );
 
-const OVERLAY_DEFS: Record<keyof OverlayState, { sourceId: string; layerId: string; tiles: string[]; opacity: number }> = {
-  bathymetry: {
-    sourceId: "overlay-bathymetry",
-    layerId: "overlay-bathymetry-layer",
-    tiles: [`${window.location.origin}/api/tiles/bathymetry/{z}/{x}/{y}.png`],
-    opacity: 0.55,
-  },
+// `bathymetry` is deliberately absent: it is no longer a raster overlay.
+// It used to point at EMODnet's `mean_atlas_land` WMS, which is a pale,
+// effectively opaque atlas image — it washed out the dark basemap and its
+// depth shading was too subtle to read a dropoff from. The toggle now drives
+// useBathymetryLayer.ts instead (our own contours, blue bands, depth
+// numbers). The toggle key stays in OverlayState so the drawer and the
+// persisted preference are unchanged.
+const OVERLAY_DEFS: Record<Exclude<keyof OverlayState, "bathymetry">, { sourceId: string; layerId: string; tiles: string[]; opacity: number }> = {
   posidonia: {
     sourceId: "overlay-posidonia",
     layerId: "overlay-posidonia-layer",
@@ -62,7 +63,7 @@ export function useMapLayers(map: MaplibreMap | null) {
   useEffect(() => {
     if (!map) return;
 
-    for (const key of Object.keys(OVERLAY_DEFS) as (keyof OverlayState)[]) {
+    for (const key of Object.keys(OVERLAY_DEFS) as (keyof typeof OVERLAY_DEFS)[]) {
       const def = OVERLAY_DEFS[key];
       const wanted = overlays[key];
       const has = map.getLayer(def.layerId);

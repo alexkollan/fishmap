@@ -10,6 +10,31 @@ Purpose: let any Claude Code session (or human) pick up this project cold and kn
 
 ---
 
+## Real depth contours — our own pipeline, because EMODnet's stop at 50 m (2026-09-17)
+
+User on the existing bathymetry overlay: *"surprise surprise, it sucks. Just by shading it doesn't help anyone. It should be something similar to c-map. lines showing different depths, and numbers."* Correct — the old overlay was EMODnet's `mean_atlas_land` WMS, a pale, effectively opaque atlas raster that washed out the dark basemap and whose shading was far too flat to read a dropoff from.
+
+**Research findings, both measured rather than assumed:**
+
+1. EMODnet *does* publish a ready-made `emodnet:contours` layer, with depth labels baked in, drawn in white — which would sit perfectly on the dark basemap. Nobody had noticed it because white contours are invisible on the white default background, which is how it renders by default.
+2. **But its shallowest contour is 50 m.** Checked against the Saronic gulf, which is mostly shallower than 100 m and still only ever draws 50/100. So for boat work (shelf edge, dropoffs) it's useful, and for shore/spearfishing — the 0–40 m band — it gives *nothing*.
+
+So rather than its rendered tiles, the new `tools/bathy-pipeline` pulls the **underlying DTM** via EMODnet's **WCS** (`emodnet__mean`, EPSG:4326, 1/960° ≈ 115 m, GeoTIFF — values are elevation, so the sea is negative) and runs marching squares (`d3-contour`) at 5/10/20/30/40/50/75/100/150/200 m. Output is 1° GeoJSON chunks in `apps/web/public/data/bathy/`, loaded on viewport by `useBathymetryLayer.ts` and rendered as blue depth bands + isobath lines + numeric labels.
+
+**Decisions worth keeping:**
+
+- **Blue ramp, not EMODnet's.** Its `multicolour`/`rainbowcolour` styles paint shallow water **red** and deep **green** — which in this app is the score vocabulary, so a red shoreline would read as "bad conditions". User picked the blue ramp explicitly when asked.
+- **Polygons *and* lines are both emitted, and that isn't redundancy.** Marching squares closes any contour running off a chunk edge *along that edge*; stroking that closure drew a hard white line down the map at every 1° boundary with a depth label on it — caught in a screenshot, not in review. Fills don't care (adjacent same-colour bands abut invisibly), so polygons keep the closure and the line features have the edge runs removed. Verified after the fix: **0 isobath vertices on a chunk boundary**, down from a visible seam.
+- **Isobaths declutter by zoom** — 50 m+ always, 5–40 m from z10 — because at low zoom the shallow set hugs the coast tightly enough to give Greece a white fringe.
+- A minimal TIFF reader rather than a `geotiff` dependency: the WCS response is uncompressed float32, and it throws loudly if EMODnet ever changes that rather than silently misreading. It needed extending once already, when larger requests came back tiled rather than stripped.
+- Coordinates rounded to 4 decimals (~11 m) — still 3x finer than the 33 m simplification tolerance and far finer than the 115 m source, where 5 decimals was shipping ~1 m precision the data doesn't have for ~20% more bytes.
+
+**Removed**: the EMODnet raster bathymetry overlay and its `bathymetry` entry in `routes/tiles.ts`'s `SOURCES`. The proxy itself stays for the seabed-habitat layer.
+
+**Verified in a real browser** (built output, not the dev server) at z8 and z11 over the Saronic/Cyclades: bands, isobaths and labels all render, the shelf and the dropoffs around Lavrio are legible, chunks load on pan, no console errors.
+
+**Open item**: the generated data is ~19 MB on disk (~5 MB gzipped) across 74 chunks, committed to the repo. That's large but in line with the existing 2.5 MB `coastline.geojson`, and the client only ever fetches the chunks under the viewport. If it becomes a problem, real vector tiles are the answer — which still needs tippecanoe, still unavailable here.
+
 ## Map UI legibility pass — and the first real browser verification (2026-09-17)
 
 User feedback on the previous day's work, three complaints, all valid:

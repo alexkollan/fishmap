@@ -1,0 +1,13 @@
+{
+  "name": "@fishmap/bathy-pipeline",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "d3-contour": "^4.0.2",
+    "@turf/turf": "^7.1.0"
+  }
+}

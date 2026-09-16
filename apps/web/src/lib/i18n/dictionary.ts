@@ -536,7 +536,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
       layers: "Layers",
       overlays: "Overlays",
       overlayLabels: {
-        bathymetry: "Bathymetry (depth)",
+        bathymetry: "Depth contours",
         posidonia: "Posidonia / seabed habitat",
         seamarks: "Seamarks",
       },
@@ -935,7 +935,7 @@ export const dictionaries: Record<Locale, Dictionary> = {
       layers: "Επίπεδα",
       overlays: "Επικαλύψεις",
       overlayLabels: {
-        bathymetry: "Βαθυμετρία (βάθος)",
+        bathymetry: "Ισοβαθείς καμπύλες",
         posidonia: "Ποσειδωνία / βυθός",
         seamarks: "Ναυτικά σημάδια",
       },

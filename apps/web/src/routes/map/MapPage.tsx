@@ -11,6 +11,7 @@ import { MapScorePanel } from "@/map/MapScorePanel";
 import { LayerDrawer } from "@/map/LayerDrawer";
 import { useMapLayers } from "@/map/useMapLayers";
 import { useWindyLayer } from "@/map/useWindyLayer";
+import { useBathymetryLayer } from "@/map/useBathymetryLayer";
 
 // MapLibre lands here as a lazy chunk (App.tsx) — no other route imports
 // anything in src/map/, so this stays the only place that pays for it
@@ -36,6 +37,7 @@ export function MapPage() {
 
   const layers = useMapLayers(map);
   const windy = useWindyLayer(map);
+  useBathymetryLayer(map, layers.overlays.bathymetry);
 
   const handleReady = useCallback((m: MaplibreMap) => setMap(m), []);
 

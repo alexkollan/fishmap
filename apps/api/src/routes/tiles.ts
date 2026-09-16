@@ -5,13 +5,18 @@ import { tileToMercatorBbox } from "../lib/webMercator.js";
 
 // EMODnet WMS is slow and rate-limited (DEV_PLAN.md §3.4, §5.5) — the
 // browser must never call it directly. This proxies XYZ tile requests to a
-// WMS GetMap call and caches the PNG on disk for 30 days (bathymetry and
-// habitat maps don't change day to day).
+// WMS GetMap call and caches the PNG on disk for 30 days (seabed habitat
+// maps don't change day to day).
 const TILE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const TILE_SIZE = 256;
 
+// `bathymetry` used to be here, proxying EMODnet's `mean_atlas_land`. Removed
+// 2026-09-17: that layer is a pale, effectively opaque atlas raster that
+// washed out the dark basemap, and its shading was too flat to read a dropoff
+// from. Depth is now drawn from our own contours instead — see
+// tools/bathy-pipeline and apps/web/src/map/useBathymetryLayer.ts. The proxy
+// itself is unchanged and still needed for the habitat layer.
 const SOURCES: Record<string, { base: string; layers: string }> = {
-  bathymetry: { base: "https://ows.emodnet-bathymetry.eu/wms", layers: "emodnet:mean_atlas_land" },
   habitat: {
     base: "https://ows.emodnet-seabedhabitats.eu/geoserver/emodnet_view/wms",
     layers: "greek_seagrass_meadows_v0906",

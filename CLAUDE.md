@@ -71,6 +71,23 @@ Per `DEV_PLAN.md` §5.6, `/map` is the only route that pays for MapLibre's weigh
 
 **Also load-bearing:** `apps/web/nginx.conf` has a `location ~* \.mjs$ { default_type application/javascript; }` block. `nginx:1.27-alpine`'s stock `mime.types` has no `.mjs` entry, so without this it serves both vendored files as `application/octet-stream` — browsers enforce strict MIME-type checking on module scripts/workers specifically and refuse to execute them, which surfaces as a real (non-silent, this time) `Failed to load module script` console error. Don't remove that nginx block along with the vendor files if either is ever changed. **When verifying anything about how these files are served in production, `vite preview` is not sufficient** — it has its own correct built-in MIME handling and will not reproduce this class of bug. Use the real `docker compose build && docker compose up -d` stack and hit the actual compose-exposed port.
 
+### Depth contours — our own, because EMODnet's stop at 50 m (2026-09-17)
+
+`tools/bathy-pipeline` generates the C-MAP-style depth layer: blue depth bands, isobath lines, and numeric depth labels (`apps/web/src/map/useBathymetryLayer.ts`, the Layer Drawer's "Depth contours" toggle).
+
+**Why we generate contours instead of using EMODnet's.** EMODnet's WMS *does* publish a ready-made `emodnet:contours` layer with labels, and it renders white — which would look right on the dark basemap. But **its shallowest contour is 50 m.** Verified directly against the Saronic gulf, which is mostly shallower than 100 m and still only ever draws 50/100. That leaves the 0–40 m band — where essentially all shore fishing and spearfishing happens — with nothing. So the pipeline pulls the *underlying DTM* instead (`emodnet__mean` over **WCS**, EPSG:4326, 1/960° ≈ 115 m cells, GeoTIFF) and runs marching squares (`d3-contour`) at 5/10/20/30/40/50/75/100/150/200 m.
+
+Things that will bite if you change this:
+
+- **Values are elevation, so the sea is negative.** The pipeline flips the sign and contours on metres-below-sea-level; land and nodata are forced to a large negative so they can't fall inside a band.
+- **Output is polygons *and* lines, deliberately.** Polygons give the fill; lines give the stroke and the labels. They aren't redundant: marching squares closes any contour that runs off a chunk edge *along that edge*, and stroking that closure drew a hard white line down the map at every 1° boundary, complete with a depth label. Fills don't care (adjacent same-colour bands abut invisibly), so polygons keep the closure while the line features have the edge runs cut out (`interiorRuns` in `build.mjs`). If you regenerate with lines merged back into the polygons, that artifact comes straight back.
+- **The blue ramp is not negotiable for a reason.** EMODnet's own `mean_multicolour`/`mean_rainbowcolour` styles paint shallow water **red** and deep water **green** — in this app red and green are the *score* vocabulary, so a red shoreline reads as "bad conditions here". Single-hue blue avoids the collision and is what real chartplotters use.
+- **Chunked 1° GeoJSON, loaded on viewport.** The whole Greek coast is far too big to load eagerly. `index.json` lists which chunks exist so the client never probes for 404s. There are no vector tiles because tippecanoe still isn't available here (see the coastline section below).
+- **Isobaths declutter by zoom**: 50 m and deeper always draw; the dense 5–40 m set appears from z10. Without that, the shallow contours hug the coast so tightly at low zoom that Greece gets a white fringe.
+- Regenerate with `node build.mjs` from `tools/bathy-pipeline` (`--force` to overwrite, `--only-chunk lon,lat` for one). It paces itself and retries — EMODnet's WCS throws transient 502s under sustained use, seen immediately during development.
+
+The old EMODnet raster bathymetry overlay (`mean_atlas_land` through the tile proxy) was **removed** — it was a pale, effectively opaque atlas image that washed out the dark basemap and whose shading was too flat to read a dropoff from. `apps/api/src/routes/tiles.ts` still proxies the seabed-habitat layer; only the `bathymetry` source entry went.
+
 ### Coastline data — orphaned tooling, kept for reference only
 
 **Nothing in the running app uses this anymore** (the map dropped the coastline line entirely — see the map section below), but `tools/coastline-pipeline/build.mjs` and its output `apps/web/public/data/coastline.geojson` are still sitting in the repo, unreferenced by any code. Left as-is rather than deleted in case coastline-derived data (segment geometry, seaward aspect) is wanted for something else later — but treat any mention of "the coastline" below as historical, not current architecture.
