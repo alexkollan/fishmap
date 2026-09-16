@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import type { Feature, FeatureCollection } from "geojson";
 import type { GeoJSONSource, Map as MaplibreMap } from "maplibre-gl";
 
-/** Depth levels the pipeline emits, shallow to deep (tools/bathy-pipeline). */
-const LEVELS = [5, 10, 20, 30, 40, 50, 75, 100, 150, 200];
+/** Depth levels the pipeline emits, shallow to deep (tools/bathy-pipeline).
+ * Must stay in sync with LEVELS there — the fill ramp is a step expression
+ * over these exact values. */
+const LEVELS = [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 4000];
 
 const SOURCE_ID = "bathy-contours";
 const FILL_LAYER = "bathy-fill";
@@ -46,16 +48,27 @@ interface BathyIndex {
  * both unambiguous and what actual chartplotters use.
  */
 const DEPTH_COLORS: Record<number, string> = {
-  5: "#7fb7d9",
-  10: "#6aa6cd",
-  20: "#5794c1",
-  30: "#4782b3",
-  40: "#3a71a4",
-  50: "#2f6194",
-  75: "#265283",
-  100: "#1e4372",
-  150: "#173560",
-  200: "#12294e",
+  5: "#8cc0dd",
+  10: "#7ab2d3",
+  15: "#6aa6cd",
+  20: "#5c9ac5",
+  25: "#4f8ebd",
+  30: "#4783b4",
+  40: "#3d77a8",
+  50: "#356c9d",
+  60: "#2e6192",
+  75: "#285787",
+  100: "#234d7c",
+  150: "#1e4471",
+  200: "#1a3c66",
+  300: "#16345b",
+  500: "#132d50",
+  750: "#102746",
+  1000: "#0e213c",
+  1500: "#0c1c33",
+  2000: "#0a172b",
+  3000: "#081324",
+  4000: "#070f1d",
 };
 
 /** Bands are drawn shallowest-first and each deeper band paints over the one

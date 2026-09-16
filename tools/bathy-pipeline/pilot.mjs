@@ -5,7 +5,7 @@
 import { contours } from "d3-contour";
 import { fetchCoverage, gridToLonLat, roundCoord, simplifyRing } from "./lib.mjs";
 
-const LEVELS = [5, 10, 20, 30, 40, 50, 75, 100, 150, 200];
+const LEVELS = [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 4000];
 
 // A deliberately awkward chunk: Kea / Kythnos / Lavrio, lots of islands and
 // broken coast, so this over- rather than under-estimates.
@@ -23,7 +23,7 @@ for (let i = 0; i < grid.values.length; i++) {
   depth[i] = Number.isFinite(v) ? -v : -9999;
 }
 
-const toLonLat = gridToLonLat(BOX.minLon, BOX.maxLat, grid.width, grid.height);
+const toLonLat = gridToLonLat(BOX.minLon, BOX.maxLat);
 const generator = contours().size([grid.width, grid.height]).thresholds(LEVELS);
 const result = generator(depth);
 

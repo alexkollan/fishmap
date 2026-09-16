@@ -10,6 +10,30 @@ Purpose: let any Claude Code session (or human) pick up this project cold and kn
 
 ---
 
+## Depth contours: finer, deeper, smoothed — and a georeferencing scare (2026-09-17, later)
+
+User feedback after using the layer: it stops at 200 m, it isn't detailed enough inshore compared to C-MAP, and *"our numbers are super off… actually wrong"*, with side-by-side C-MAP and Fishmap screenshots of St John's Bay (Ormos Agiou Ioannou, ~37.664/23.955).
+
+**The "wrong numbers" claim was investigated properly and the pipeline came out clean — but only after I broke it and caught myself.** Sequence worth remembering:
+
+1. A point-in-band agreement check said 87.9% of sample points matched the source, with best agreement if the probe was shifted ~half a cell east/south. That looked like a georeferencing bug, and there's a plausible story for one (GeoTIFF origin is the first pixel's outer *corner*; its sample is the pixel *centre*).
+2. Applied a +0.5 cell correction. **Wrong.** d3-contour already returns coordinates in a space where ⟨0.5, 0.5⟩ is the first cell's centre, so the conventions cancel — the "fix" pushed every contour ~46 m east.
+3. Caught it by writing `transect.mjs`, which is the rigorous test the agreement percentage was only a noisy proxy for: walk a constant-latitude transect, find by interpolation where the *raw grid* crosses a given isobath, and compare against where the *generated line* actually crosses. Reverted; signed offset now reads **−3.5 m at 10 m and −10.7 m at 20 m against a 92 m cell**, i.e. correct.
+
+**So the depths are faithful to EMODnet. The gap against C-MAP is the source, not the code** — and there is no free way to close it. EMODnet's own high-resolution survey layer (`emodnet:hr_bathymetry_area`) renders *empty* over the Saronic gulf, checked directly, so there's no better free tier to switch to; C-MAP draws ~1 m contours from licensed hydrographic-office soundings. Told the user plainly rather than claiming parity.
+
+**What did change:**
+
+- **Levels extended both ways**: 5/10/15/20/25/30/40/50/60 inshore (was 5/10/20/30/40/50) and on down through 300/500/1000/2000/4000 for the Hellenic Trench, which answers "why does it stop at 200 m".
+- **Chaikin smoothing pass.** The raw marching-squares output was visibly stair-stepped at fishing zooms — clearly so in the user's screenshot. Chaikin moves a line by at most a quarter cell (~29 m), well inside the source's own uncertainty, and can't invent structure. Simplification tolerance loosened to 0.0006 (~50 m, still sub-cell) to pay for the vertex count it adds.
+- **No contour finer than 5 m**, deliberately: on a 115 m interpolated grid a 2 m contour is mostly noise hugging the coastline, at a large size cost.
+
+**A second seam regression, caught the same way.** Adding smoothing silently brought back the chunk-boundary line the previous session had fixed: `onEdge` matches coordinates lying *exactly* on the boundary, and Chaikin averages every vertex with its neighbours, nudging them just off it. Fix is ordering — split into interior runs on the unsmoothed coordinates, then smooth each run. Re-verified at 0 isobath vertices on a chunk edge. **Anything that moves vertices must run after the edge split, not before.**
+
+Simplification tolerance is now depth-dependent (~50 m inshore, up to ~440 m at 500 m+). Deep isobaths are long, smooth, and only ever viewed zoomed out, so inshore precision there was pure file size — this is where most of the saving is.
+
+`transect.mjs` is kept as the positional regression test. `pilot.mjs` stays for re-measuring size when levels or tolerance change.
+
 ## Real depth contours — our own pipeline, because EMODnet's stop at 50 m (2026-09-17)
 
 User on the existing bathymetry overlay: *"surprise surprise, it sucks. Just by shading it doesn't help anyone. It should be something similar to c-map. lines showing different depths, and numbers."* Correct — the old overlay was EMODnet's `mean_atlas_land` WMS, a pale, effectively opaque atlas raster that washed out the dark basemap and whose shading was far too flat to read a dropoff from.

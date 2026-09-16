@@ -24,23 +24,45 @@
 import { mkdir, writeFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { contours } from "d3-contour";
-import { fetchCoverage, gridToLonLat, roundCoord, simplifyRing } from "./lib.mjs";
+import { fetchCoverage, gridToLonLat, roundCoord, simplifyRing, smoothRing } from "./lib.mjs";
 
 const GREECE = { minLon: 19, minLat: 34, maxLon: 30, maxLat: 42 };
 
-/** Depth levels in metres below sea level. Dense inshore, where it matters
- * for shore/spear work and where EMODnet gives nothing, then coarser out to
- * the shelf edge. Beyond 200 m is abyss for these purposes — no contour, the
- * basemap just stays dark. */
-const LEVELS = [5, 10, 20, 30, 40, 50, 75, 100, 150, 200];
+/** Depth levels in metres below sea level.
+ *
+ * Dense inshore, where shore and spear fishing happen and where EMODnet's own
+ * ready-made contours give nothing at all (their shallowest is 50 m), then
+ * widening out through the shelf and down the Hellenic Trench, which reaches
+ * past 5,000 m south-west of the Peloponnese.
+ *
+ * The inshore spacing is limited by the source, not by choice: a 115 m grid
+ * interpolated from sparse nearshore surveys cannot honestly support the
+ * ~1 m intervals a real chart draws from survey soundings. 5 m is about as
+ * fine as this data carries honestly; a 2 m contour on it is mostly
+ * interpolation noise hugging the coastline, at a large size cost. */
+const LEVELS = [
+  5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 4000,
+];
 
 const CHUNK_DEG = 1;
 
-/** ~33 m. One third of a DTM cell, so it never invents precision the source
- * doesn't have, while cutting vertex count ~5x. Measured against a
- * deliberately awkward Cycladic chunk: keeps 399 of 457 rings; the 58 it
- * drops are sub-tolerance specks. */
-const SIMPLIFY_TOLERANCE = 0.0003;
+/** Simplification tolerance in degrees, by depth.
+ *
+ * ~50 m inshore: under half a DTM cell, so it never invents precision the
+ * source doesn't have. Looser than it would otherwise be because a Chaikin
+ * pass follows, which roughly doubles vertex count again.
+ *
+ * Deep contours get progressively coarser treatment. They are long, smooth
+ * and only ever looked at zoomed out — nobody is navigating a 2,000 m
+ * isobath — so spending inshore precision on them is pure file size. This
+ * is where most of the saving is: the deep levels carry the longest lines.
+ */
+function toleranceFor(depth) {
+  if (depth >= 500) return 0.004;
+  if (depth >= 200) return 0.002;
+  if (depth >= 60) return 0.001;
+  return 0.0006;
+}
 
 const OUT_DIR = path.resolve(process.cwd(), "../../apps/web/public/data/bathy");
 
@@ -74,7 +96,7 @@ async function buildChunk(lon, lat) {
   }
   if (seaCells === 0) return null;
 
-  const toLonLat = gridToLonLat(lon, lat + CHUNK_DEG, grid.width, grid.height);
+  const toLonLat = gridToLonLat(lon, lat + CHUNK_DEG);
   const result = contours().size([grid.width, grid.height]).thresholds(LEVELS)(depth);
 
   // A contour that runs off the edge of a chunk gets closed *along that edge*
@@ -119,12 +141,19 @@ async function buildChunk(lon, lat) {
     for (const polygon of c.coordinates) {
       const rings = [];
       for (const ring of polygon) {
-        const simplified = simplifyRing(
-          ring.map(([x, y]) => toLonLat(x, y)),
-          SIMPLIFY_TOLERANCE,
-        );
+        const simplified = simplifyRing(ring.map(([x, y]) => toLonLat(x, y)), toleranceFor(c.value));
         if (simplified.length < 3) continue;
-        const coords = simplified.map(([a, b]) => [roundCoord(a), roundCoord(b)]);
+
+        // Order matters. `onEdge` tests for coordinates lying exactly on the
+        // chunk boundary, and Chaikin averages every vertex with its
+        // neighbours — which nudges boundary vertices just off the line and
+        // makes them undetectable. So split the ring into interior runs
+        // *first*, on the unsmoothed coordinates, and smooth afterwards.
+        // Getting this backwards silently brings the chunk-seam artifact
+        // back, which is exactly what happened when smoothing was added.
+        const base = simplified.map(([a, b]) => [roundCoord(a), roundCoord(b)]);
+
+        const coords = smoothRing(base, true).map(([a, b]) => [roundCoord(a), roundCoord(b)]);
         // GeoJSON polygons must close; simplification keeps the first and
         // last vertex, but rounding can still separate them.
         const first = coords[0];
@@ -132,7 +161,11 @@ async function buildChunk(lon, lat) {
         if (first[0] !== last[0] || first[1] !== last[1]) coords.push([first[0], first[1]]);
         if (coords.length < 4) continue;
         rings.push(coords);
-        for (const run of interiorRuns(coords.slice(0, -1))) lines.push(run);
+
+        for (const run of interiorRuns(base)) {
+          const smoothed = smoothRing(run, false).map(([a, b]) => [roundCoord(a), roundCoord(b)]);
+          if (smoothed.length >= 2) lines.push(smoothed);
+        }
       }
       if (rings.length) polygons.push(rings);
     }

@@ -134,12 +134,46 @@ export async function fetchCoverage(minLat, minLon, maxLat, maxLon, { timeoutMs 
   throw lastError;
 }
 
-/** Row 0 of the returned grid is the *northern* edge (negative y offset in
- * the geotransform), so grid y maps to descending latitude. */
-export function gridToLonLat(minLon, maxLat, width, height) {
-  const lonStep = CELL_DEG;
-  const latStep = CELL_DEG;
-  return (x, y) => [minLon + x * lonStep, maxLat - y * latStep];
+/**
+ * Row 0 of the returned grid is the *northern* edge (negative y offset in
+ * the geotransform), so grid y maps to descending latitude.
+ *
+ * No half-cell term, and that is deliberate — the two conventions cancel.
+ * The GeoTIFF's origin is the outer *corner* of the first pixel while its
+ * sample represents that pixel's *centre* (+0.5), but d3-contour returns
+ * coordinates in a space where ⟨0.5, 0.5⟩ is already the centre of the first
+ * cell (-0.5). Adding a correction for the first without the second pushed
+ * every contour half a cell (~46 m) east; measured with transect.mjs,
+ * which finds where the raw grid crosses a given isobath by interpolation
+ * and compares that to where the generated line actually falls.
+ */
+export function gridToLonLat(minLon, maxLat) {
+  return (x, y) => [minLon + x * CELL_DEG, maxLat - y * CELL_DEG];
+}
+
+/**
+ * One Chaikin corner-cutting pass. The source grid is 115 m, so raw marching
+ * squares output is visibly stair-stepped at the zooms people actually fish
+ * at — corners at exact cell boundaries. Chaikin rounds those without moving
+ * the line more than a quarter cell (~29 m), which is well inside the
+ * source's own vertical/horizontal uncertainty and is what chart products do
+ * too. It never invents structure: the smoothed curve stays inside the
+ * convex hull of the original vertices.
+ */
+export function smoothRing(points, closed) {
+  if (points.length < 3) return points;
+  const out = [];
+  const n = points.length;
+  const last = closed ? n : n - 1;
+  if (!closed) out.push(points[0]);
+  for (let i = 0; i < last; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % n];
+    out.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25]);
+    out.push([a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
+  }
+  if (!closed) out.push(points[n - 1]);
+  return out;
 }
 
 /** Douglas-Peucker on a lon/lat ring, tolerance in degrees. Contours come out
